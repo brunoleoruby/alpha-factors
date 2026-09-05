@@ -8,6 +8,7 @@ import { RankingsTable } from "@/components/desk/rankings-table";
 import { StrategyPanel } from "@/components/desk/strategy-panel";
 import { TradesTable } from "@/components/desk/trades-table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -65,10 +66,19 @@ export function FactorDesk() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={desk.running ? "default" : "secondary"}>
-            {desk.running ? "Live paper on" : "Idle"}
+            {desk.running ? `Live paper on · ${desk.ticks} new sessions` : "Idle"}
           </Badge>
           <Badge variant="outline">{state.market.dates[state.asOfIndex]}</Badge>
           <Badge variant="outline">{state.stats.tradeCount} fills</Badge>
+          {desk.running ? (
+            <Button type="button" variant="destructive" onClick={desk.stop}>
+              Stop automation
+            </Button>
+          ) : (
+            <Button type="button" onClick={desk.startAutomation} disabled={desk.busy}>
+              Run live paper
+            </Button>
+          )}
         </div>
       </header>
 
@@ -122,12 +132,21 @@ export function FactorDesk() {
           </CardHeader>
           <CardContent className="pt-4">
             <TabsContent value="ranks">
+              <p className="text-muted-foreground mb-3 text-xs tracking-wide uppercase">
+                Cross-section ranked by composite score
+              </p>
               <RankingsTable rankings={state.rankings} targets={state.targets} />
             </TabsContent>
             <TabsContent value="positions">
+              <p className="text-muted-foreground mb-3 text-xs tracking-wide uppercase">
+                Open holdings marked to the latest close
+              </p>
               <PositionsTable positions={state.positions} />
             </TabsContent>
             <TabsContent value="trades">
+              <p className="text-muted-foreground mb-3 text-xs tracking-wide uppercase">
+                Latest rebalance fills (newest first)
+              </p>
               <TradesTable trades={state.trades} />
             </TabsContent>
           </CardContent>

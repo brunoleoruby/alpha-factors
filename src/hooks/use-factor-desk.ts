@@ -11,23 +11,29 @@ export function useFactorDesk() {
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const timer = useRef<number | null>(null);
+  const [ticks, setTicks] = useState(0);
   const configRef = useRef(config);
 
   useEffect(() => {
     configRef.current = config;
   }, [config]);
 
+  useEffect(() => {
+    if (!running) return;
+    const id = window.setInterval(() => {
+      setState((prev) => stepLive(prev, configRef.current));
+      setTicks((n) => n + 1);
+    }, 700);
+    return () => window.clearInterval(id);
+  }, [running]);
+
   const stop = useCallback(() => {
     setRunning(false);
-    if (timer.current) {
-      window.clearInterval(timer.current);
-      timer.current = null;
-    }
   }, []);
 
   const rebuild = useCallback((next: StrategyConfig = configRef.current) => {
-    stop();
+    setRunning(false);
+    setTicks(0);
     setBusy(true);
     setError(null);
     try {
@@ -37,7 +43,7 @@ export function useFactorDesk() {
     } finally {
       setBusy(false);
     }
-  }, [stop]);
+  }, []);
 
   const applyAndReplay = useCallback((next: StrategyConfig) => {
     setConfig(next);
@@ -45,14 +51,8 @@ export function useFactorDesk() {
   }, []);
 
   const startAutomation = useCallback(() => {
-    if (timer.current) return;
     setRunning(true);
-    timer.current = window.setInterval(() => {
-      setState((prev) => stepLive(prev, configRef.current));
-    }, 900);
   }, []);
-
-  useEffect(() => () => stop(), [stop]);
 
   return {
     config,
@@ -61,6 +61,7 @@ export function useFactorDesk() {
     running,
     busy,
     error,
+    ticks,
     rebuild,
     applyAndReplay,
     startAutomation,

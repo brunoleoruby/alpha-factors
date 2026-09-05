@@ -134,15 +134,21 @@ export function StrategyPanel({
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button className="flex-1" onClick={onRebuild} disabled={busy || running}>
+          <Button type="button" className="flex-1" onClick={onRebuild} disabled={busy || running}>
             {busy ? "Scoring…" : "Rebuild paper book"}
           </Button>
           {running ? (
-            <Button className="flex-1" variant="destructive" onClick={onStop}>
+            <Button type="button" className="flex-1" variant="destructive" onClick={onStop}>
               Stop automation
             </Button>
           ) : (
-            <Button className="flex-1" variant="secondary" onClick={onAutomate} disabled={busy}>
+            <Button
+              type="button"
+              className="flex-1"
+              variant="secondary"
+              onClick={onAutomate}
+              disabled={busy}
+            >
               Run live paper
             </Button>
           )}
