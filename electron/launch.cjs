@@ -64,11 +64,20 @@ async function main() {
     await waitUntilUp();
   }
 
-  const electron = spawn(electronBin, [path.join(root, "electron", "main.cjs")], {
-    cwd: root,
-    stdio: "inherit",
-    env: { ...process.env, DESK_PORT: PORT },
-  });
+  const electron = spawn(
+    electronBin,
+    [
+      "--no-sandbox",
+      "--disable-gpu",
+      "--in-process-gpu",
+      path.join(root, "electron", "main.cjs"),
+    ],
+    {
+      cwd: root,
+      stdio: "inherit",
+      env: { ...process.env, DESK_PORT: PORT },
+    },
+  );
 
   electron.on("exit", (code) => {
     if (child && !alreadyUp) child.kill();

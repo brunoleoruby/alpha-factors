@@ -1,6 +1,12 @@
 const { app, BrowserWindow, Menu, shell } = require("electron");
 const path = require("path");
 
+app.disableHardwareAcceleration();
+if (process.platform === "linux") {
+  app.commandLine.appendSwitch("no-sandbox");
+  app.commandLine.appendSwitch("disable-gpu");
+}
+
 const PORT = process.env.DESK_PORT || "43123";
 const DESK_URL = process.env.DESK_URL || `http://127.0.0.1:${PORT}/?desktop=1`;
 
