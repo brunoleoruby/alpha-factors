@@ -2,7 +2,31 @@
 
 Local desktop software that **reads stock headlines**, names the event, finds similar past prints, and estimates how the name usually behaved afterward.
 
-## Run it on your PC (like an installed app)
+## Save onto this Windows PC (Documents)
+
+Origin CLI is **WSL only**, not PowerShell. Repo: [varun-g-v/alpha-factors](https://cursor.com/codebase/varun-g-v/alpha-factors) (private).
+
+```bash
+# Run in WSL (Origin CLI is not available in PowerShell)
+curl -fsSL https://downloads.cursor.com/origin/install.sh | sh
+origin auth login
+
+# Clone into your Windows Documents folder
+WIN_HOME=$(wslpath "$(cmd.exe /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r')")
+origin repo clone varun-g-v/alpha-factors "$WIN_HOME/Documents/alpha-factors"
+```
+
+If `origin` is not found:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Then in File Explorer open `Documents\alpha-factors` and double-click `Start Desk.bat` (install [Node.js](https://nodejs.org) first if needed).
+
+Origin CLI docs: https://cursor.com/docs/origin/cli
+
 
 1. Install [Node.js 20+](https://nodejs.org) (this includes `npm`).
 2. Copy this project folder onto the machine.
