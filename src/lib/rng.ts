@@ -1,4 +1,3 @@
-/** Mulberry32 — deterministic PRNG so paper books replay the same path. */
 export function mulberry32(seed: number) {
   let a = seed >>> 0;
   return function next() {

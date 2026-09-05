@@ -1,13 +1,14 @@
 "use client";
 
-import type { EquityPoint } from "@/lib/trading/types";
-import { formatPct, formatUsd } from "@/lib/trading/format";
+import { formatPct, formatUsd } from "@/lib/format";
 
-export function EquityChart({ points }: { points: EquityPoint[] }) {
+export type NavPoint = { date: string; equity: number };
+
+export function EquityChart({ points }: { points: NavPoint[] }) {
   if (points.length < 2) {
     return (
       <div className="text-muted-foreground flex h-64 items-center justify-center text-sm">
-        Run a backtest to plot the factor book.
+        The news book will plot once the algorithm starts trading recognized patterns.
       </div>
     );
   }
@@ -43,7 +44,6 @@ export function EquityChart({ points }: { points: EquityPoint[] }) {
     .join(" ");
 
   const area = `${line} L${(padL + innerW).toFixed(2)} ${(padT + innerH).toFixed(2)} L${padL} ${(padT + innerH).toFixed(2)} Z`;
-
   const ticks = 4;
   const yTicks = Array.from({ length: ticks + 1 }, (_, i) => min + (span * i) / ticks);
   const xLabels = [0, Math.floor(points.length / 2), points.length - 1].map((i) => ({
@@ -61,9 +61,9 @@ export function EquityChart({ points }: { points: EquityPoint[] }) {
       </div>
       <svg
         viewBox={`0 0 ${w} ${h}`}
-        className="h-72 w-full"
+        className="h-64 w-full md:h-72"
         role="img"
-        aria-label="Paper book equity curve"
+        aria-label="News-driven paper equity"
       >
         <defs>
           <linearGradient id="navFill" x1="0" y1="0" x2="0" y2="1">

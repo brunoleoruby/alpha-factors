@@ -1,35 +1,37 @@
-# Factor desk
+# News pattern desk
 
-Paper-trading desk that ranks a 24-name universe on six factors, builds a long (optional short) book from the composite score, and rebalances on a schedule.
+Algorithm that **reads stock headlines**, names the event, finds similar past prints, and estimates how the name usually behaved afterward. A paper book trades only the high-confidence patterns.
 
-This is **simulated market data** and **paper fills only**. It is not connected to a broker.
+This is **not** a classic factor model (value, momentum, quality). The signal is the news pattern.
 
-## Factors
+## What the algorithm does
 
-| Factor | What it measures |
-| --- | --- |
-| Momentum | Blend of 21-day and 63-day return |
-| Mean reversion | Distance below the 20-day average |
-| Low volatility | Negative 21-day realized vol |
-| Value | Simulated earnings yield |
-| Quality | Simulated ROE |
-| Liquidity | Log average dollar volume |
+1. **Classify** — keyword and phrase rules map a headline to an event (earnings beat/miss, guidance raise/cut, upgrade/downgrade, M&A, legal, outage, buyback, offering, and so on) plus sentiment and intensity.
+2. **Rhyme** — TF-IDF cosine similarity against earlier headlines, with a boost for the same event type. Only history dated *before* the print is used.
+3. **Behavior** — similarity-weighted average of those neighbors' 1-day and 5-day returns, hit rate, and fade/reversal rate.
+4. **Structure flags** — a **cascade** is the same event on the same name within two days; an **echo** is a near-duplicate already on the tape.
+5. **Ticket** — long or short if confidence and expected move clear the bars you set.
 
-Weights are z-scored cross-sectionally, then mixed into one composite. The top names are bought (score-weighted). If shorts are on, the bottom names are sold for a 50/50 long-short book.
+Paste any headline in **Read a headline** to run the same stack by hand.
+
+## Data
+
+Headlines and subsequent returns are **simulated** so the matcher has a labeled history without a Bloomberg or news-API key. Swap the corpus later for a real wire; the recognizer stays the same.
 
 ## Run locally
 
 ```bash
 npm install
-npm run dev -- --port 43123
+npm run dev -- --port 43123 --hostname 0.0.0.0
 ```
 
 Open [http://127.0.0.1:43123](http://127.0.0.1:43123).
 
-- **Rebuild paper book** regenerates the synthetic history and reruns the backtest.
-- **Run live paper** appends a new simulated session about once a second and rebalances when due.
-- Strategy settings persist in `localStorage`.
+```bash
+npm test   # classifier + neighbor-search smoke
+```
 
-## Stack
+## Layout
 
-Next.js, TypeScript, Tailwind, shadcn/ui, Recharts. The scoring and portfolio engine lives in `src/lib/trading/`.
+- `src/lib/news/` — taxonomy, classifier, TF-IDF, corpus, pattern match, paper engine
+- `src/components/desk/` — tape, inspector, controls

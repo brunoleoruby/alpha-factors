@@ -1,5 +1,5 @@
 {
-  "name": "factor-desk",
+  "name": "news-pattern-desk",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx tsx src/lib/trading/engine.smoke.ts"
+    "test": "npx tsx src/lib/news/engine.smoke.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

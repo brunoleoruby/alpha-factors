@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Factor desk — paper trading",
+  title: "News pattern desk",
   description:
-    "Automate a long/short paper book from momentum, value, quality, low-vol, mean-reversion, and liquidity scores.",
+    "Classify stock headlines, match them to similar past prints, and trade the typical price path those news patterns produced.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

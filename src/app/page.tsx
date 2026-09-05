@@ -1,5 +1,5 @@
-import { FactorDesk } from "@/components/desk/factor-desk";
+import { NewsDesk } from "@/components/desk/news-desk";
 
 export default function Home() {
-  return <FactorDesk />;
+  return <NewsDesk />;
 }
