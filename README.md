@@ -1,37 +1,52 @@
-# News pattern desk
+# News Pattern Desk
 
-Algorithm that **reads stock headlines**, names the event, finds similar past prints, and estimates how the name usually behaved afterward. A paper book trades only the high-confidence patterns.
+Local desktop software that **reads stock headlines**, names the event, finds similar past prints, and estimates how the name usually behaved afterward.
 
-This is **not** a classic factor model (value, momentum, quality). The signal is the news pattern.
+## Run it on your PC (like an installed app)
+
+1. Install [Node.js 20+](https://nodejs.org) (this includes `npm`).
+2. Copy this project folder onto the machine.
+3. **Windows:** double-click `Start Desk.bat`  
+   **Mac / Linux:** double-click `start-desk.sh`, or in a terminal:
+
+```bash
+chmod +x start-desk.sh
+./start-desk.sh
+```
+
+The first launch runs `npm install`, starts the local engine, and opens a **native window** (not a browser tab). Close the window to quit.
+
+Later launches:
+
+```bash
+npm run desktop
+```
+
+Settings (confidence bars, hold period, cascade/echo) are remembered in this user profile.
+
+### If the window does not open
+
+- Confirm Node is on your PATH (`node -v`).
+- From the project folder: `npm install` then `npm run desktop`.
+- Linux may need Chromium libraries for Electron (`libnss3`, `libatk1.0`, `libgbm1`).
 
 ## What the algorithm does
 
-1. **Classify** — keyword and phrase rules map a headline to an event (earnings beat/miss, guidance raise/cut, upgrade/downgrade, M&A, legal, outage, buyback, offering, and so on) plus sentiment and intensity.
-2. **Rhyme** — TF-IDF cosine similarity against earlier headlines, with a boost for the same event type. Only history dated *before* the print is used.
-3. **Behavior** — similarity-weighted average of those neighbors' 1-day and 5-day returns, hit rate, and fade/reversal rate.
-4. **Structure flags** — a **cascade** is the same event on the same name within two days; an **echo** is a near-duplicate already on the tape.
-5. **Ticket** — long or short if confidence and expected move clear the bars you set.
+1. **Classify** — map a headline to an event (earnings, guidance, M&A, legal, outage, …).
+2. **Rhyme** — TF-IDF cosine vs earlier headlines of the same type.
+3. **Behavior** — typical 1-day / 5-day path, hit rate, fade rate.
+4. **Flags** — cascade (same name, same event within two days) and echo (near-duplicate).
+5. **Ticket** — paper long/short only when confidence and expected move clear your bars.
 
 Paste any headline in **Read a headline** to run the same stack by hand.
 
-## Data
+Headlines and subsequent returns are **simulated** so it runs offline with no news-vendor key.
 
-Headlines and subsequent returns are **simulated** so the matcher has a labeled history without a Bloomberg or news-API key. Swap the corpus later for a real wire; the recognizer stays the same.
-
-## Run locally
+## Browser (optional)
 
 ```bash
 npm install
-npm run dev -- --port 43123 --hostname 0.0.0.0
+npm run dev
 ```
 
-Open [http://127.0.0.1:43123](http://127.0.0.1:43123).
-
-```bash
-npm test   # classifier + neighbor-search smoke
-```
-
-## Layout
-
-- `src/lib/news/` — taxonomy, classifier, TF-IDF, corpus, pattern match, paper engine
-- `src/components/desk/` — tape, inspector, controls
+Then open http://127.0.0.1:43123 — same engine, in a tab.

@@ -63,19 +63,19 @@ export function NewsDesk() {
   const traded = state.trades.filter((t) => t.confidence > 0).length;
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 md:px-8">
+    <div className="flex min-h-full flex-1 flex-col">
+    <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-5 px-4 py-5 md:px-6">
       <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
-            News behavior engine
+            Local workstation
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight md:text-3xl">
-            Pattern desk
+            News Pattern Desk
           </h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm leading-relaxed">
-            Classify each headline into an event type, rhyme it against similar past prints with
-            TF-IDF, and read the typical 1-day and 5-day path those patterns produced. Paper trades
-            fire only when the recognized behavior is strong enough.
+            Runs on your PC in its own window. Classify each headline, rhyme it against similar past
+            prints, and paper-trade only when the recognized behavior is strong enough.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -265,11 +265,19 @@ export function NewsDesk() {
       </Card>
 
       <Separator />
-      <p className="text-muted-foreground pb-8 text-xs leading-relaxed">
+      <p className="text-muted-foreground pb-2 text-xs leading-relaxed">
         Headlines and subsequent returns are simulated so the matcher has a labeled history without
         a news-vendor key. The algorithm is the point: event classification, TF-IDF rhyme, cascade
         and echo flags, then a paper ticket. Not a broker, not live newswire.
       </p>
+    </div>
+    <footer className="border-border/80 text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-4 py-1.5 font-mono text-[11px] md:px-6">
+      <span>News Pattern Desk</span>
+      <span>session {state.dates[state.asOfIndex]}</span>
+      <span>{state.tape.length} prints</span>
+      <span>local engine · this PC</span>
+      <span className="ml-auto">{desk.running ? "TAPE LIVE" : "IDLE"}</span>
+    </footer>
     </div>
   );
 }

@@ -1,0 +1,64 @@
+const { app, BrowserWindow, Menu, shell } = require("electron");
+const path = require("path");
+
+const PORT = process.env.DESK_PORT || "43123";
+const DESK_URL = process.env.DESK_URL || `http://127.0.0.1:${PORT}/?desktop=1`;
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 1440,
+    height: 920,
+    minWidth: 1024,
+    minHeight: 700,
+    title: "News Pattern Desk",
+    backgroundColor: "#171717",
+    autoHideMenuBar: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  win.once("ready-to-show", () => win.show());
+  win.loadURL(DESK_URL);
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+}
+
+const menu = Menu.buildFromTemplate([
+  {
+    label: "File",
+    submenu: [
+      { role: "reload" },
+      { role: "forcereload" },
+      { type: "separator" },
+      { role: "quit" },
+    ],
+  },
+  {
+    label: "View",
+    submenu: [
+      { role: "togglefullscreen" },
+      { role: "resetzoom" },
+      { role: "zoomin" },
+      { role: "zoomout" },
+    ],
+  },
+]);
+
+app.whenReady().then(() => {
+  Menu.setApplicationMenu(menu);
+  createWindow();
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit();
+});

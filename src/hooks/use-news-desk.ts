@@ -12,6 +12,8 @@ import { DEFAULT_STRATEGY, NAMES, type StrategyConfig } from "@/lib/news/taxonom
 import type { BehaviorForecast } from "@/lib/news/patterns";
 import type { NewsItem } from "@/lib/news/corpus";
 
+const SETTINGS_KEY = "news-pattern-desk-settings";
+
 export function useNewsDesk() {
   const [config, setConfig] = useState<StrategyConfig>(DEFAULT_STRATEGY);
   const [state, setState] = useState<NewsState>(() => createNewsState(DEFAULT_STRATEGY));
@@ -23,6 +25,11 @@ export function useNewsDesk() {
 
   useEffect(() => {
     configRef.current = config;
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
+    } catch {
+      /* ignore quota */
+    }
   }, [config]);
 
   useEffect(() => {
