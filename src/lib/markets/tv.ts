@@ -12,6 +12,19 @@ export function chartPath(symbol: string, locale: ExchangeId) {
   return locale === "NSE" ? `/nse/stocks/${slug}` : `/stocks/${slug}`;
 }
 
+export type Candle = {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
+
+export function yahooSymbol(symbol: string, locale: ExchangeId) {
+  if (locale === "NSE") return `${symbol}.NS`;
+  return symbol;
+}
+
 export function findListing(listings: Listing[], raw: string) {
   const key = decodeURIComponent(raw).trim().toUpperCase();
   return listings.find((l) => l.symbol.toUpperCase() === key) ?? null;

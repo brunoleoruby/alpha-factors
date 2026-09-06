@@ -45,8 +45,14 @@ export function StockChartView({
         heightClassName="h-[520px] md:h-[680px]"
       />
       <p className="text-muted-foreground text-xs">
-        Live candles come from TradingView, not from this desk&apos;s simulated news tape. Needs
-        network access.{" "}
+        {locale === "NSE" ? (
+          <>
+            NSE cash names are blocked on TradingView&apos;s public embed (it falls back to AAPL). This
+            page plots live NSE candles in TradingView Lightweight Charts.{" "}
+          </>
+        ) : (
+          <>Live candles from the TradingView widget. </>
+        )}
         <a
           href={`https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tv)}`}
           target="_blank"
