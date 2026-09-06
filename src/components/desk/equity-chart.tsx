@@ -4,7 +4,21 @@ import { formatPct, formatUsd } from "@/lib/format";
 
 export type NavPoint = { date: string; equity: number };
 
-export function EquityChart({ points }: { points: NavPoint[] }) {
+function axisTick(tick: number) {
+  const a = Math.abs(tick);
+  if (a >= 10_000_000) return `${(tick / 10_000_000).toFixed(1)}Cr`;
+  if (a >= 100_000) return `${(tick / 100_000).toFixed(1)}L`;
+  if (a >= 1000) return `${(tick / 1000).toFixed(0)}k`;
+  return String(Math.round(tick));
+}
+
+export function EquityChart({
+  points,
+  money = formatUsd,
+}: {
+  points: NavPoint[];
+  money?: (n: number) => string;
+}) {
   if (points.length < 2) {
     return (
       <div className="text-muted-foreground flex h-64 items-center justify-center text-sm">
@@ -23,7 +37,7 @@ export function EquityChart({ points }: { points: NavPoint[] }) {
 
   const w = 920;
   const h = 280;
-  const padL = 52;
+  const padL = 58;
   const padR = 16;
   const padT = 16;
   const padB = 28;
@@ -54,7 +68,7 @@ export function EquityChart({ points }: { points: NavPoint[] }) {
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-3 text-sm">
-        <p className="text-primary font-mono">{formatUsd(last.equity)}</p>
+        <p className="text-primary font-mono">{money(last.equity)}</p>
         <p className={`font-mono ${ret >= 0 ? "text-gain" : "text-loss"}`}>
           {formatPct(ret)} over {points.length} sessions
         </p>
@@ -92,7 +106,7 @@ export function EquityChart({ points }: { points: NavPoint[] }) {
                 fontSize="11"
                 fontFamily="ui-monospace, monospace"
               >
-                {(tick / 1000).toFixed(0)}k
+                {axisTick(tick)}
               </text>
             </g>
           );

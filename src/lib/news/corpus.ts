@@ -1,6 +1,8 @@
 import { classifyHeadline, type Classification } from "./classify";
 import { gaussian, hashString, mulberry32 } from "@/lib/rng";
-import { EVENT_RULES, NAMES, type EventType } from "./taxonomy";
+import type { Listing } from "@/lib/markets/types";
+import { US_LISTINGS } from "@/lib/markets/us";
+import { EVENT_RULES, type EventType } from "./taxonomy";
 
 export type NewsItem = {
   id: string;
@@ -93,14 +95,30 @@ const TEMPLATES: Record<EventType, string[]> = {
 
 const THINGS: Record<string, string[]> = {
   Tech: ["AI chips", "cloud", "PCs", "ads", "search", "foundry"],
-  Consumer: ["e-commerce", "ads", "retail", "logistics"],
-  Auto: ["EV", "autopilot", "energy storage"],
-  Financials: ["trading", "credit card", "net interest"],
-  Energy: ["refining", "upstream", "LNG"],
+  IT: ["IT services", "BFSI deals", "digital", "cloud"],
+  Consumer: ["e-commerce", "ads", "retail", "logistics", "jewellery"],
+  Auto: ["EV", "PV volumes", "two-wheelers"],
+  Financials: ["NII", "asset quality", "credit growth", "AUM"],
+  Energy: ["refining", "upstream", "LNG", "petchem"],
   Health: ["pharmacy", "drug trial", "insurance"],
-  Industrials: ["jetliners", "defense", "services"],
-  Media: ["streaming", "parks", "ads"],
+  Healthcare: ["hospitals", "diagnostics", "occupancy"],
+  Pharma: ["USFDA", "formulations", "API"],
+  Industrials: ["order book", "defence", "capex"],
+  Media: ["ad revenue", "subscriptions"],
+  FMCG: ["rural demand", "volume growth", "premium"],
+  Telecom: ["ARPU", "5G", "subscriber"],
+  Materials: ["cement", "chemicals", "realisations"],
+  Metals: ["steel spreads", "aluminium", "exports"],
+  Utilities: ["PLF", "tariffs", "renewables"],
+  Realty: ["pre-sales", "collections", "launches"],
+  Infrastructure: ["order inflow", "execution"],
+  Aviation: ["load factor", "ATF", "fares"],
+  Conglomerate: ["portfolio", "incubation"],
 };
+
+const NSE_SOURCES = ["Moneycontrol", "Economic Times", "Business Standard", "Mint", "NSE"];
+
+export { NSE_SOURCES };
 
 function tradingDates(count: number, start = "2025-03-03") {
   const dates: string[] = [];
@@ -113,34 +131,74 @@ function tradingDates(count: number, start = "2025-03-03") {
   return dates;
 }
 
-function fill(template: string, symbol: string, name: string, thing: string) {
+function fill(template: string, symbol: string, name: string, thing: string, buyback: string) {
   return template
     .replaceAll("{symbol}", symbol)
     .replaceAll("{name}", name)
     .replaceAll("{thing}", thing)
-    .replace("$buyback", "$8 billion");
+    .replace("$buyback", buyback);
 }
+
+export type CorpusOptions = {
+  listings?: Listing[];
+  seed?: number;
+  sessions?: number;
+  sources?: string[];
+  buybackLabel?: string;
+  locale?: "US" | "NSE";
+};
 
 /**
  * Builds a labeled news history. Subsequent returns are drawn from the
  * event's empirical fingerprint plus noise, so nearest-neighbor matching
  * recovers real behavior patterns instead of random fills.
  */
-export function generateCorpus(seed = 7, sessions = 180): NewsItem[] {
+export function generateCorpus(options: CorpusOptions = {}): NewsItem[] {
+  const listings = options.listings ?? US_LISTINGS;
+  const seed = options.seed ?? 7;
+  const sessions = options.sessions ?? 180;
+  const sources = options.sources ?? SOURCES;
   const rand = mulberry32(seed);
   const dates = tradingDates(sessions);
   const items: NewsItem[] = [];
   let n = 0;
+  const buyback = options.buybackLabel ?? "$8 billion";
+  const locale = options.locale ?? "US";
 
   for (const date of dates) {
     const k = 2 + Math.floor(rand() * 4);
     for (let i = 0; i < k; i++) {
-      const name = NAMES[Math.floor(rand() * NAMES.length)];
+      const name = listings[Math.floor(rand() * listings.length)];
       const rule = EVENT_RULES[Math.floor(rand() * EVENT_RULES.length)];
-      const thingList = THINGS[name.sector] ?? ["core"];
+      const thingList = THINGS[name.sector] ?? ["core business"];
       const thing = thingList[Math.floor(rand() * thingList.length)];
-      const templates = TEMPLATES[rule.id];
-      const headline = fill(templates[Math.floor(rand() * templates.length)], name.symbol, name.name, thing);
+      let templates = TEMPLATES[rule.id];
+      if (locale === "NSE") {
+        if (rule.id === "regulation") {
+          templates = [
+            "SEBI opens review of {name} {thing} practices",
+            "GST notice lands on {symbol} {thing} unit",
+            ...templates,
+          ];
+        }
+        if (rule.id === "macro") {
+          templates = [
+            "RBI holds repo rate; {thing} names including {name} in focus",
+            "FII flows swing; {symbol} among most traded on NSE",
+            ...templates,
+          ];
+        }
+        if (rule.id === "offering") {
+          templates = ["{name} prices QIP of shares", "{symbol} launches dilutive offering", ...templates];
+        }
+      }
+      const headline = fill(
+        templates[Math.floor(rand() * templates.length)],
+        name.symbol,
+        name.name,
+        thing,
+        buyback,
+      );
       const cls = classifyHeadline(headline);
       const shock = gaussian(rand) * 0.012;
       const ret1d = rule.typical1d * (0.7 + cls.intensity) + shock;
@@ -152,7 +210,7 @@ export function generateCorpus(seed = 7, sessions = 180): NewsItem[] {
         date,
         symbol: name.symbol,
         headline,
-        source: SOURCES[Math.floor(rand() * SOURCES.length)],
+        source: sources[Math.floor(rand() * sources.length)],
         classification: cls,
         ret1d: Number(ret1d.toFixed(4)),
         ret5d: Number(ret5d.toFixed(4)),

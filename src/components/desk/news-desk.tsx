@@ -8,6 +8,7 @@ import { PatternInspector } from "@/components/desk/pattern-inspector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -29,9 +30,42 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNewsDesk } from "@/hooks/use-news-desk";
 import { formatPct, formatUsd, formatUsdFine, pnlClass } from "@/lib/format";
 import type { StrategyConfig } from "@/lib/news/taxonomy";
+import { DEFAULT_STRATEGY } from "@/lib/news/taxonomy";
+import { US_LISTINGS } from "@/lib/markets/us";
+import type { Listing } from "@/lib/markets/types";
+import type { ExchangeId } from "@/lib/markets/types";
 
-export function NewsDesk() {
-  const desk = useNewsDesk();
+export function NewsDesk({
+  locale = "US",
+  listings = US_LISTINGS,
+  money = formatUsd,
+  moneyFine = formatUsdFine,
+  defaultPaste = "Apple cuts guidance on softer iPhone trends in China",
+  defaultSymbol = "AAPL",
+  settingsKey = "news-pattern-desk-settings",
+  defaultConfig = DEFAULT_STRATEGY,
+  title = "News Pattern Desk",
+  eyebrow = "Local workstation",
+}: {
+  locale?: ExchangeId;
+  listings?: Listing[];
+  money?: (n: number) => string;
+  moneyFine?: (n: number) => string;
+  defaultPaste?: string;
+  defaultSymbol?: string;
+  settingsKey?: string;
+  defaultConfig?: StrategyConfig;
+  title?: string;
+  eyebrow?: string;
+}) {
+  const desk = useNewsDesk({
+    listings,
+    locale,
+    settingsKey,
+    defaultPaste,
+    defaultSymbol,
+    defaultConfig,
+  });
   const debounce = useRef<number | null>(null);
 
   useEffect(() => () => {
@@ -68,10 +102,10 @@ export function NewsDesk() {
       <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-primary text-xs font-medium tracking-[0.22em] uppercase">
-            Local workstation
+            {eyebrow}
           </p>
           <h1 className="font-heading mt-1 text-3xl font-semibold tracking-tight md:text-4xl">
-            News Pattern Desk
+            {title}
           </h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm leading-relaxed">
             Runs on your PC in its own window. Classify each headline, rhyme it against similar past
@@ -97,7 +131,7 @@ export function NewsDesk() {
       </header>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Kpi label="Paper NAV" value={formatUsd(last?.equity ?? 0)} />
+        <Kpi label="Paper NAV" value={money(last?.equity ?? 0)} />
         <Kpi label="News-book return" value={formatPct(ret)} tone={ret} />
         <Kpi label="Max drawdown" value={formatPct(dd)} tone={dd} />
         <Kpi label="Pattern tickets" value={String(traded)} />
@@ -115,23 +149,42 @@ export function NewsDesk() {
           <div className="grid gap-3 md:grid-cols-[140px_1fr_auto] md:items-end">
             <div className="space-y-1.5">
               <Label>Name</Label>
-              <Select
-                value={desk.pasteSymbol}
-                onValueChange={(v) => {
-                  if (v) desk.setPasteSymbol(v);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {desk.names.map((n) => (
-                    <SelectItem key={n.symbol} value={n.symbol}>
-                      {n.symbol}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {listings.length > 24 ? (
+                <>
+                  <Input
+                    list="desk-symbols"
+                    value={desk.pasteSymbol}
+                    onChange={(e) => desk.setPasteSymbol(e.target.value.toUpperCase())}
+                    placeholder="Symbol"
+                    autoComplete="off"
+                  />
+                  <datalist id="desk-symbols">
+                    {listings.map((n) => (
+                      <option key={n.symbol} value={n.symbol}>
+                        {n.name}
+                      </option>
+                    ))}
+                  </datalist>
+                </>
+              ) : (
+                <Select
+                  value={desk.pasteSymbol}
+                  onValueChange={(v) => {
+                    if (v) desk.setPasteSymbol(v);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {desk.names.map((n) => (
+                      <SelectItem key={n.symbol} value={n.symbol}>
+                        {n.symbol}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Headline</Label>
@@ -163,12 +216,12 @@ export function NewsDesk() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Paper book from recognized news</CardTitle>
             <CardDescription>
-              {formatUsd(desk.config.capital)} start. Cash {formatUsd(last?.cash ?? 0)}. Open{" "}
+              {money(desk.config.capital)} start. Cash {money(last?.cash ?? 0)}. Open{" "}
               {state.positions.length} names.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <EquityChart points={state.equity} />
+            <EquityChart points={state.equity} money={money} />
           </CardContent>
         </Card>
       </div>
@@ -255,10 +308,10 @@ export function NewsDesk() {
               </div>
             </TabsContent>
             <TabsContent value="trades">
-              <Trades trades={state.trades} />
+              <Trades trades={state.trades} moneyFine={moneyFine} />
             </TabsContent>
             <TabsContent value="pos">
-              <Positions positions={state.positions} />
+              <Positions positions={state.positions} moneyFine={moneyFine} />
             </TabsContent>
           </CardContent>
         </Tabs>
@@ -272,6 +325,7 @@ export function NewsDesk() {
       </p>
     </div>
     <footer className="border-primary/20 text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-4 py-1.5 font-mono text-[11px] md:px-6">
+      <span>{locale === "NSE" ? "NSE · India" : "US"}</span>
       <span>News Pattern Desk</span>
       <span>session {state.dates[state.asOfIndex]}</span>
       <span>{state.tape.length} prints</span>
@@ -297,7 +351,9 @@ function Kpi({ label, value, tone }: { label: string; value: string; tone?: numb
 
 function Trades({
   trades,
+  moneyFine,
 }: {
+  moneyFine: (n: number) => string;
   trades: {
     date: string;
     symbol: string;
@@ -333,7 +389,7 @@ function Trades({
                 {t.side}
               </TableCell>
               <TableCell className="text-right font-mono">{t.shares.toLocaleString()}</TableCell>
-              <TableCell className="text-right font-mono">{formatUsdFine(t.price)}</TableCell>
+              <TableCell className="text-right font-mono">{moneyFine(t.price)}</TableCell>
               <TableCell className="max-w-sm text-xs">{t.reason}</TableCell>
             </TableRow>
           ))}
@@ -345,7 +401,9 @@ function Trades({
 
 function Positions({
   positions,
+  moneyFine,
 }: {
+  moneyFine: (n: number) => string;
   positions: { symbol: string; shares: number; avgPrice: number; headline: string; exitOn: string; openedOn: string }[];
 }) {
   if (!positions.length) {
@@ -368,7 +426,7 @@ function Positions({
             <TableRow key={p.symbol + p.openedOn}>
               <TableCell className="font-medium">{p.symbol}</TableCell>
               <TableCell className="text-right font-mono">{p.shares.toLocaleString()}</TableCell>
-              <TableCell className="text-right font-mono">{formatUsdFine(p.avgPrice)}</TableCell>
+              <TableCell className="text-right font-mono">{moneyFine(p.avgPrice)}</TableCell>
               <TableCell className="font-mono text-xs">{p.exitOn}</TableCell>
               <TableCell className="max-w-sm text-xs">{p.headline}</TableCell>
             </TableRow>

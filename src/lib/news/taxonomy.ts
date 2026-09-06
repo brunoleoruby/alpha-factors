@@ -150,7 +150,7 @@ export const EVENT_RULES: EventRule[] = [
     id: "regulation",
     label: "Regulation",
     description: "Policy, tariff, or license news; sign depends on wording.",
-    keywords: ["regulator", "fcc", "ftc", "tariff", "export ban", "license revoked", "antitrust ruling"],
+    keywords: ["regulator", "fcc", "ftc", "tariff", "export ban", "license revoked", "antitrust ruling", "sebi", "rbi", "gst"],
     typical1d: -0.007,
     typical5d: -0.006,
     reversal: 0.4,
@@ -159,7 +159,7 @@ export const EVENT_RULES: EventRule[] = [
     id: "macro",
     label: "Macro / rates",
     description: "Fed, CPI, oil — market-wide tone more than a single name.",
-    keywords: ["federal reserve", "rate cut", "rate hike", "cpi", "inflation data", "jobs report", "oil prices"],
+    keywords: ["federal reserve", "rate cut", "rate hike", "cpi", "inflation data", "jobs report", "oil prices", "repo rate", "rbi", "fii"],
     typical1d: 0.002,
     typical5d: 0.001,
     reversal: 0.5,
@@ -171,24 +171,9 @@ export const EVENT_BY_ID = Object.fromEntries(EVENT_RULES.map((r) => [r.id, r]))
   EventRule
 >;
 
-export const NAMES = [
-  { symbol: "NVDA", name: "NVIDIA", sector: "Tech" },
-  { symbol: "AAPL", name: "Apple", sector: "Tech" },
-  { symbol: "MSFT", name: "Microsoft", sector: "Tech" },
-  { symbol: "AMZN", name: "Amazon", sector: "Consumer" },
-  { symbol: "GOOGL", name: "Alphabet", sector: "Tech" },
-  { symbol: "META", name: "Meta", sector: "Tech" },
-  { symbol: "TSLA", name: "Tesla", sector: "Auto" },
-  { symbol: "JPM", name: "JPMorgan", sector: "Financials" },
-  { symbol: "XOM", name: "Exxon", sector: "Energy" },
-  { symbol: "UNH", name: "UnitedHealth", sector: "Health" },
-  { symbol: "PFE", name: "Pfizer", sector: "Health" },
-  { symbol: "BA", name: "Boeing", sector: "Industrials" },
-  { symbol: "DIS", name: "Disney", sector: "Media" },
-  { symbol: "NFLX", name: "Netflix", sector: "Media" },
-  { symbol: "INTC", name: "Intel", sector: "Tech" },
-  { symbol: "AMD", name: "AMD", sector: "Tech" },
-] as const;
+import { US_LISTINGS } from "@/lib/markets/us";
+
+export const NAMES = US_LISTINGS;
 
 export type StrategyConfig = {
   minConfidence: number;
@@ -208,4 +193,9 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
   skipEcho: true,
   capital: 1_000_000,
   costBps: 8,
+};
+
+export const DEFAULT_STRATEGY_NSE: StrategyConfig = {
+  ...DEFAULT_STRATEGY,
+  capital: 10_000_000,
 };

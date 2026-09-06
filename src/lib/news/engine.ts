@@ -1,5 +1,7 @@
 import { classifyHeadline } from "./classify";
-import { generateCorpus, type NewsItem } from "./corpus";
+import { generateCorpus, NSE_SOURCES, type NewsItem } from "./corpus";
+import type { Listing } from "@/lib/markets/types";
+import { US_LISTINGS } from "@/lib/markets/us";
 import { eventFingerprints, indexCorpus, recognize, type BehaviorForecast } from "./patterns";
 import { DEFAULT_STRATEGY, type StrategyConfig } from "./taxonomy";
 import { vectorize } from "./tfidf";
@@ -47,13 +49,14 @@ export type NewsState = {
   cash: number;
   fingerprints: ReturnType<typeof eventFingerprints>;
   selectedId: string | null;
+  listings: Listing[];
 };
 
 function uniqueDates(corpus: NewsItem[]) {
   return [...new Set(corpus.map((n) => n.date))].sort();
 }
 
-function priceFor(symbol: string, date: string) {
+function priceFor(symbol: string, date: string, book: Map<string, Listing>) {
   let h = 2166136261;
   const s = symbol + date;
   for (let i = 0; i < s.length; i++) {
@@ -61,37 +64,39 @@ function priceFor(symbol: string, date: string) {
     h = Math.imul(h, 16777619);
   }
   const u = (h >>> 0) / 4294967296;
-  const base: Record<string, number> = {
-    NVDA: 120,
-    AAPL: 220,
-    MSFT: 410,
-    AMZN: 180,
-    GOOGL: 165,
-    META: 500,
-    TSLA: 240,
-    JPM: 200,
-    XOM: 110,
-    UNH: 520,
-    PFE: 27,
-    BA: 175,
-    DIS: 95,
-    NFLX: 700,
-    INTC: 22,
-    AMD: 140,
-  };
-  return Number(((base[symbol] ?? 80) * (0.85 + 0.3 * u)).toFixed(2));
+  const base = book.get(symbol)?.startPrice ?? 80;
+  return Number((base * (0.85 + 0.3 * u)).toFixed(2));
 }
 
-function nav(cash: number, positions: Position[], date: string) {
-  return positions.reduce((acc, p) => acc + p.shares * priceFor(p.symbol, date), cash);
+function nav(cash: number, positions: Position[], date: string, book: Map<string, Listing>) {
+  return positions.reduce((acc, p) => acc + p.shares * priceFor(p.symbol, date, book), cash);
 }
 
-export function createNewsState(config: StrategyConfig = DEFAULT_STRATEGY, seed = 7): NewsState {
-  const corpus = generateCorpus(seed, 180);
+export type EngineOptions = {
+  listings?: Listing[];
+  seed?: number;
+  locale?: "US" | "NSE";
+};
+
+export function createNewsState(
+  config: StrategyConfig = DEFAULT_STRATEGY,
+  options: EngineOptions = {},
+): NewsState {
+  const listings = options.listings ?? US_LISTINGS;
+  const seed = options.seed ?? 7;
+  const locale = options.locale ?? "US";
+  const corpus = generateCorpus({
+    listings,
+    seed,
+    locale,
+    sources: locale === "NSE" ? NSE_SOURCES : undefined,
+    buybackLabel: locale === "NSE" ? "Rs 2,000 crore" : "$8 billion",
+  });
   indexCorpus(corpus);
   const dates = uniqueDates(corpus);
   const warmup = Math.min(50, dates.length - 1);
-  return simulateTo(corpus, dates, warmup, config);
+  const book = new Map(listings.map((l) => [l.symbol, l]));
+  return simulateTo(corpus, dates, warmup, config, book);
 }
 
 function simulateTo(
@@ -99,6 +104,7 @@ function simulateTo(
   dates: string[],
   asOfIndex: number,
   config: StrategyConfig,
+  book: Map<string, Listing>,
 ): NewsState {
   const space = indexCorpus(corpus);
   const analyzed: AnalyzedItem[] = [];
@@ -108,6 +114,7 @@ function simulateTo(
   const equity: EquityPoint[] = [];
   let peak = config.capital;
   const warmupDate = dates[Math.min(40, asOfIndex)];
+  const listings = [...book.values()];
 
   for (let d = 0; d <= asOfIndex; d++) {
     const date = dates[d];
@@ -116,7 +123,7 @@ function simulateTo(
 
     positions = positions.filter((p) => {
       if (p.exitOn > date) return true;
-      const px = priceFor(p.symbol, date);
+      const px = priceFor(p.symbol, date, book);
       cash += p.shares * px;
       trades.push({
         date,
@@ -138,8 +145,8 @@ function simulateTo(
       if (forecast.side === "skip") continue;
       if (positions.some((p) => p.symbol === item.symbol)) continue;
 
-      const px = priceFor(item.symbol, date);
-      const equityNow = nav(cash, positions, date);
+      const px = priceFor(item.symbol, date, book);
+      const equityNow = nav(cash, positions, date, book);
       const notional = equityNow * 0.08;
       const signed = forecast.side === "long" ? 1 : -1;
       const shares = Math.trunc(notional / px) * signed;
@@ -167,7 +174,7 @@ function simulateTo(
       });
     }
 
-    const equityNow = nav(cash, positions, date);
+    const equityNow = nav(cash, positions, date, book);
     peak = Math.max(peak, equityNow);
     equity.push({
       date,
@@ -190,16 +197,21 @@ function simulateTo(
     cash,
     fingerprints: eventFingerprints(corpus.filter((n) => n.date <= dates[asOfIndex])),
     selectedId: tape[0]?.id ?? analyzed.at(-1)?.id ?? null,
+    listings,
   };
 }
 
+function bookFrom(state: NewsState) {
+  return new Map(state.listings.map((l) => [l.symbol, l]));
+}
+
 export function replayConfig(state: NewsState, config: StrategyConfig): NewsState {
-  return simulateTo(state.corpus, state.dates, state.asOfIndex, config);
+  return simulateTo(state.corpus, state.dates, state.asOfIndex, config, bookFrom(state));
 }
 
 export function stepNews(state: NewsState, config: StrategyConfig): NewsState {
   if (state.asOfIndex >= state.dates.length - 1) return state;
-  return simulateTo(state.corpus, state.dates, state.asOfIndex + 1, config);
+  return simulateTo(state.corpus, state.dates, state.asOfIndex + 1, config, bookFrom(state));
 }
 
 export function analyzeHeadline(

@@ -8,29 +8,39 @@ import {
   stepNews,
   type NewsState,
 } from "@/lib/news/engine";
-import { DEFAULT_STRATEGY, NAMES, type StrategyConfig } from "@/lib/news/taxonomy";
+import { DEFAULT_STRATEGY, type StrategyConfig } from "@/lib/news/taxonomy";
 import type { BehaviorForecast } from "@/lib/news/patterns";
 import type { NewsItem } from "@/lib/news/corpus";
+import type { Listing } from "@/lib/markets/types";
+import type { ExchangeId } from "@/lib/markets/types";
 
-const SETTINGS_KEY = "news-pattern-desk-settings";
-
-export function useNewsDesk() {
-  const [config, setConfig] = useState<StrategyConfig>(DEFAULT_STRATEGY);
-  const [state, setState] = useState<NewsState>(() => createNewsState(DEFAULT_STRATEGY));
+export function useNewsDesk(opts: {
+  listings: Listing[];
+  locale: ExchangeId;
+  settingsKey: string;
+  defaultPaste: string;
+  defaultSymbol: string;
+  defaultConfig?: StrategyConfig;
+}) {
+  const startConfig = opts.defaultConfig ?? DEFAULT_STRATEGY;
+  const [config, setConfig] = useState<StrategyConfig>(startConfig);
+  const [state, setState] = useState<NewsState>(() =>
+    createNewsState(startConfig, { listings: opts.listings, locale: opts.locale }),
+  );
   const [running, setRunning] = useState(false);
-  const [paste, setPaste] = useState("Apple cuts guidance on softer iPhone trends in China");
-  const [pasteSymbol, setPasteSymbol] = useState("AAPL");
+  const [paste, setPaste] = useState(opts.defaultPaste);
+  const [pasteSymbol, setPasteSymbol] = useState(opts.defaultSymbol);
   const [scratch, setScratch] = useState<{ item: NewsItem; forecast: BehaviorForecast } | null>(null);
   const configRef = useRef(config);
 
   useEffect(() => {
     configRef.current = config;
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
+      localStorage.setItem(opts.settingsKey, JSON.stringify(config));
     } catch {
       /* ignore quota */
     }
-  }, [config]);
+  }, [config, opts.settingsKey]);
 
   useEffect(() => {
     if (!running) return;
@@ -47,9 +57,15 @@ export function useNewsDesk() {
 
   const rebuild = useCallback(() => {
     setRunning(false);
-    setState(createNewsState(configRef.current, Math.floor(Math.random() * 10_000)));
+    setState(
+      createNewsState(configRef.current, {
+        listings: opts.listings,
+        locale: opts.locale,
+        seed: Math.floor(Math.random() * 10_000),
+      }),
+    );
     setScratch(null);
-  }, []);
+  }, [opts.listings, opts.locale]);
 
   const select = useCallback((id: string) => {
     setState((prev) => ({ ...prev, selectedId: id }));
@@ -73,7 +89,7 @@ export function useNewsDesk() {
     setPaste,
     pasteSymbol,
     setPasteSymbol,
-    names: NAMES,
+    names: opts.listings,
     scratch,
     rebuild,
     select,
