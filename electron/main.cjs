@@ -17,7 +17,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     title: "News Pattern Desk",
-    backgroundColor: "#171717",
+    backgroundColor: "#1c1914",
     autoHideMenuBar: true,
     show: false,
     webPreferences: {

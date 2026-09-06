@@ -31,7 +31,11 @@ export function NewsTape({
             <button
               type="button"
               onClick={() => onSelect(item.id)}
-              className={`w-full px-1 py-3 text-left transition-colors ${active ? "bg-muted/60" : "hover:bg-muted/35"}`}
+              className={`w-full border-l-2 px-2 py-3 text-left transition-colors ${
+                active
+                  ? "border-primary bg-accent/50"
+                  : "border-transparent hover:bg-muted/40"
+              }`}
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs">{item.symbol}</span>

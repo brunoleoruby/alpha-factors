@@ -54,8 +54,8 @@ export function EquityChart({ points }: { points: NavPoint[] }) {
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-3 text-sm">
-        <p className="font-mono text-emerald-400">{formatUsd(last.equity)}</p>
-        <p className={`font-mono ${ret >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+        <p className="text-primary font-mono">{formatUsd(last.equity)}</p>
+        <p className={`font-mono ${ret >= 0 ? "text-gain" : "text-loss"}`}>
           {formatPct(ret)} over {points.length} sessions
         </p>
       </div>
@@ -67,8 +67,8 @@ export function EquityChart({ points }: { points: NavPoint[] }) {
       >
         <defs>
           <linearGradient id="navFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgb(52 211 153)" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="rgb(52 211 153)" stopOpacity="0" />
+            <stop offset="0%" stopColor="#d4bf8a" stopOpacity="0.32" />
+            <stop offset="100%" stopColor="#d4bf8a" stopOpacity="0" />
           </linearGradient>
         </defs>
         {yTicks.map((tick) => {
@@ -98,7 +98,7 @@ export function EquityChart({ points }: { points: NavPoint[] }) {
           );
         })}
         <path d={area} fill="url(#navFill)" />
-        <path d={line} fill="none" stroke="rgb(52 211 153)" strokeWidth="2.5" />
+        <path d={line} fill="none" stroke="#d4bf8a" strokeWidth="2.25" />
         {xLabels.map(({ i, label }) => (
           <text
             key={label + i}

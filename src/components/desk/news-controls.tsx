@@ -30,7 +30,7 @@ export function NewsControls({
   onStop: () => void;
 }) {
   return (
-    <Card className="border-border/80 bg-card/80">
+    <Card className="border-primary/15 bg-card/90">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">How the algorithm trades a pattern</CardTitle>
         <CardDescription>

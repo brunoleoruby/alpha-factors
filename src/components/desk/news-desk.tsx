@@ -67,10 +67,10 @@ export function NewsDesk() {
     <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-5 px-4 py-5 md:px-6">
       <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
+          <p className="text-primary text-xs font-medium tracking-[0.22em] uppercase">
             Local workstation
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight md:text-3xl">
+          <h1 className="font-heading mt-1 text-3xl font-semibold tracking-tight md:text-4xl">
             News Pattern Desk
           </h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm leading-relaxed">
@@ -103,7 +103,7 @@ export function NewsDesk() {
         <Kpi label="Pattern tickets" value={String(traded)} />
       </div>
 
-      <Card className="border-border/80 bg-card/80">
+      <Card className="border-primary/15 bg-card/90">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Read a headline</CardTitle>
           <CardDescription>
@@ -159,7 +159,7 @@ export function NewsDesk() {
           onLive={() => desk.setRunning(true)}
           onStop={() => desk.setRunning(false)}
         />
-        <Card className="border-border/80 bg-card/80">
+        <Card className="border-primary/15 bg-card/90">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Paper book from recognized news</CardTitle>
             <CardDescription>
@@ -174,7 +174,7 @@ export function NewsDesk() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="border-border/80 bg-card/80">
+        <Card className="border-primary/15 bg-card/90">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Today&apos;s tape</CardTitle>
             <CardDescription>Click a print to inspect its nearest rhymes.</CardDescription>
@@ -183,7 +183,7 @@ export function NewsDesk() {
             <NewsTape items={state.tape} selectedId={state.selectedId} onSelect={desk.select} />
           </CardContent>
         </Card>
-        <Card className="border-border/80 bg-card/80">
+        <Card className="border-primary/15 bg-card/90">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
               {desk.scratch ? "Pasted headline" : "Pattern match"}
@@ -202,7 +202,7 @@ export function NewsDesk() {
         </Card>
       </div>
 
-      <Card className="border-border/80 bg-card/80">
+      <Card className="border-primary/15 bg-card/90">
         <Tabs defaultValue="events">
           <CardHeader className="pb-0">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -271,7 +271,7 @@ export function NewsDesk() {
         and echo flags, then a paper ticket. Not a broker, not live newswire.
       </p>
     </div>
-    <footer className="border-border/80 text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-4 py-1.5 font-mono text-[11px] md:px-6">
+    <footer className="border-primary/20 text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-4 py-1.5 font-mono text-[11px] md:px-6">
       <span>News Pattern Desk</span>
       <span>session {state.dates[state.asOfIndex]}</span>
       <span>{state.tape.length} prints</span>
@@ -284,9 +284,9 @@ export function NewsDesk() {
 
 function Kpi({ label, value, tone }: { label: string; value: string; tone?: number }) {
   return (
-    <Card className="border-border/80 bg-card/80">
+    <Card className="border-primary/15 bg-card/90">
       <CardContent className="px-4 py-3">
-        <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{label}</p>
+        <p className="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase">{label}</p>
         <p className={`mt-1 font-mono text-lg font-semibold ${tone !== undefined ? pnlClass(tone) : ""}`}>
           {value}
         </p>
@@ -329,7 +329,7 @@ function Trades({
             <TableRow key={`${t.date}-${t.symbol}-${i}`}>
               <TableCell className="font-mono text-xs">{t.date}</TableCell>
               <TableCell className="font-medium">{t.symbol}</TableCell>
-              <TableCell className={t.side === "buy" ? "text-emerald-400" : "text-rose-400"}>
+              <TableCell className={t.side === "buy" ? "text-gain" : "text-loss"}>
                 {t.side}
               </TableCell>
               <TableCell className="text-right font-mono">{t.shares.toLocaleString()}</TableCell>

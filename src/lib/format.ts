@@ -25,7 +25,7 @@ export const formatNum = (n: number) => num.format(n);
 export const formatSigned = (n: number) => `${n > 0 ? "+" : ""}${num.format(n)}`;
 
 export function pnlClass(n: number) {
-  if (n > 0.0001) return "text-emerald-400";
-  if (n < -0.0001) return "text-rose-400";
+  if (n > 0.0001) return "text-gain";
+  if (n < -0.0001) return "text-loss";
   return "text-muted-foreground";
 }
