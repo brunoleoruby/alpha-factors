@@ -134,17 +134,19 @@ export function TradingViewChart({
           s.kind === "high"
             ? {
                 time: s.time as UTCTimestamp,
-                position: "aboveBar" as const,
+                position: "atPriceTop" as const,
+                price: s.price,
                 color: "#d4bf8a",
-                shape: "arrowDown" as const,
-                text: "H",
+                shape: "circle" as const,
+                size: 0.9,
               }
             : {
                 time: s.time as UTCTimestamp,
-                position: "belowBar" as const,
+                position: "atPriceBottom" as const,
+                price: s.price,
                 color: "#3d9a78",
-                shape: "arrowUp" as const,
-                text: "L",
+                shape: "circle" as const,
+                size: 0.9,
               },
         ),
       );
