@@ -82,6 +82,6 @@ Then open http://127.0.0.1:43123 — same engine, in a tab.
 - **US** — `/` — US names, USD paper book.
 - **NSE** — `/nse` — National Stock Exchange of India, rupee paper book, Indian headline templates (SEBI, RBI, QIP).
 - **All stocks (US)** — `/stocks` — directory plus a TradingView chart page per name (`/stocks/AAPL`).
-- **All stocks (NSE)** — `/nse/stocks` — searchable directory; each name opens `/nse/stocks/RELIANCE` with a TradingView chart.
+- **Polycab case** — `/nse/cases/polycab` — Dec 2023–Jan 2024 IT search, CBDT note, and Q3 beat; categories plus similar events on other NSE names with 1d/5d paths.
 
 Charts use TradingView Lightweight Charts for every name. Switch 15m / 1H / 1D / 1W / 1M and use **Swings** to mark fractal highs and lows as dots on that timeframe. NSE cash names cannot use TradingView’s public embed; Open on TradingView still goes to the full site.
