@@ -27,6 +27,7 @@ Then in File Explorer open `Documents\alpha-factors` and double-click `Start Des
 
 Origin CLI docs: https://cursor.com/docs/origin/cli
 
+## Run after it is on disk
 
 1. Install [Node.js 20+](https://nodejs.org) (this includes `npm`).
 2. Copy this project folder onto the machine.
