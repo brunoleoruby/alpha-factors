@@ -1,6 +1,5 @@
 import { NseSubnav } from "@/components/desk/exchange-nav";
 import { NewsDesk } from "@/components/desk/news-desk";
-import { formatInr, formatInrFine } from "@/lib/format";
 import { NSE_LISTINGS } from "@/lib/markets/nse";
 import { DEFAULT_STRATEGY_NSE } from "@/lib/news/taxonomy";
 
@@ -11,8 +10,6 @@ export default function NseDeskPage() {
       <NewsDesk
         locale="NSE"
         listings={NSE_LISTINGS}
-        money={formatInr}
-        moneyFine={formatInrFine}
         defaultPaste="Reliance Industries cuts guidance on softer petchem trends"
         defaultSymbol="RELIANCE"
         settingsKey="news-pattern-desk-nse"

@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNewsDesk } from "@/hooks/use-news-desk";
-import { formatPct, formatUsd, formatUsdFine, pnlClass } from "@/lib/format";
+import { formatInr, formatInrFine, formatPct, formatUsd, formatUsdFine, pnlClass } from "@/lib/format";
 import type { StrategyConfig } from "@/lib/news/taxonomy";
 import { DEFAULT_STRATEGY } from "@/lib/news/taxonomy";
 import { US_LISTINGS } from "@/lib/markets/us";
@@ -38,8 +38,6 @@ import type { ExchangeId } from "@/lib/markets/types";
 export function NewsDesk({
   locale = "US",
   listings = US_LISTINGS,
-  money = formatUsd,
-  moneyFine = formatUsdFine,
   defaultPaste = "Apple cuts guidance on softer iPhone trends in China",
   defaultSymbol = "AAPL",
   settingsKey = "news-pattern-desk-settings",
@@ -49,8 +47,6 @@ export function NewsDesk({
 }: {
   locale?: ExchangeId;
   listings?: Listing[];
-  money?: (n: number) => string;
-  moneyFine?: (n: number) => string;
   defaultPaste?: string;
   defaultSymbol?: string;
   settingsKey?: string;
@@ -58,6 +54,8 @@ export function NewsDesk({
   title?: string;
   eyebrow?: string;
 }) {
+  const money = locale === "NSE" ? formatInr : formatUsd;
+  const moneyFine = locale === "NSE" ? formatInrFine : formatUsdFine;
   const desk = useNewsDesk({
     listings,
     locale,
