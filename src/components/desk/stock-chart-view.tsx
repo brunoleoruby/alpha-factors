@@ -48,7 +48,7 @@ export function StockChartView({
         {locale === "NSE" ? (
           <>
             NSE cash names are blocked on TradingView&apos;s public embed. Charts here use
-            TradingView Lightweight Charts with a Swings tool (H/L) on every timeframe.{" "}
+            TradingView Lightweight Charts with a Swings tool (dots on highs and lows) on every timeframe.{" "}
           </>
         ) : (
           <>Live candles with swing high / low marks on each timeframe. </>
