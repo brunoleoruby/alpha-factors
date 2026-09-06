@@ -60,8 +60,9 @@ Settings (confidence bars, hold period, cascade/echo) are remembered in this use
 1. **Classify** — map a headline to an event (earnings, guidance, M&A, legal, outage, …).
 2. **Rhyme** — TF-IDF cosine vs earlier headlines of the same type.
 3. **Behavior** — typical 1-day / 5-day path, hit rate, fade rate.
-4. **Flags** — cascade (same name, same event within two days) and echo (near-duplicate).
-5. **Ticket** — paper long/short only when confidence and expected move clear your bars.
+4. **Neural** — a small MLP trained on earlier labeled prints maps non-linear sentiment and alternative-data flags (wire vs local source, SEBI/RBI/FII language, intensity) into its own 1d/5d move; the desk blends that with the neighbor path.
+5. **Flags** — cascade (same name, same event within two days) and echo (near-duplicate).
+6. **Ticket** — paper long/short only when confidence and expected move clear your bars.
 
 Paste any headline in **Read a headline** to run the same stack by hand.
 

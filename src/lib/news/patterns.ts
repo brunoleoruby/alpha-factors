@@ -1,6 +1,8 @@
 import type { NewsItem } from "./corpus";
 import { cosine, makeSpace, vectorize, type VectorSpace } from "./tfidf";
 import { EVENT_BY_ID, type EventType, type StrategyConfig } from "./taxonomy";
+import type { NeuralNet } from "./nn";
+import { neuralMove } from "./nn";
 
 export type PatternMatch = {
   id: string;
@@ -30,6 +32,10 @@ export type BehaviorForecast = {
   cascadeCount: number;
   matches: PatternMatch[];
   side: "long" | "short" | "skip";
+  linear1d: number;
+  neural1d: number;
+  neural5d: number;
+  neuralAgree: boolean;
 };
 
 function mean(xs: number[]) {
@@ -54,6 +60,7 @@ export function recognize(
   history: NewsItem[],
   space: VectorSpace,
   config: StrategyConfig,
+  net?: NeuralNet,
 ): BehaviorForecast {
   const query = item.vec ?? vectorize(space, item.classification);
   const scored: PatternMatch[] = [];
@@ -84,18 +91,13 @@ export function recognize(
 
   const w = matches.map((m) => Math.max(m.similarity, 0.01));
   const wsum = w.reduce((a, b) => a + b, 0) || 1;
-  const expected1d = matches.length
+  let expected1d = matches.length
     ? matches.reduce((acc, m, i) => acc + m.ret1d * w[i], 0) / wsum
     : EVENT_BY_ID[item.classification.eventType].typical1d * item.classification.intensity;
-  const expected5d = matches.length
+  let expected5d = matches.length
     ? matches.reduce((acc, m, i) => acc + m.ret5d * w[i], 0) / wsum
     : EVENT_BY_ID[item.classification.eventType].typical5d * item.classification.intensity;
-
-  const hitRate = matches.length
-    ? matches.filter((m) => Math.sign(m.ret1d) === Math.sign(expected1d) || expected1d === 0).length /
-      matches.length
-    : 0.5;
-  const reversalRate = matches.length ? matches.filter((m) => m.reversed).length / matches.length : 0.4;
+  const linear1d = expected1d;
 
   const recentSame = history.filter(
     (h) =>
@@ -108,6 +110,18 @@ export function recognize(
   const echo = matches.some(
     (m) => m.symbol === item.symbol && m.similarity > 0.82 && daysBetween(m.date, item.date) <= 5,
   );
+
+  const nn = net ? neuralMove(net, item, cascade, echo) : { neural1d: expected1d, neural5d: expected5d };
+  const neuralAgree =
+    Math.sign(nn.neural1d) === Math.sign(linear1d) || Math.abs(linear1d) < 0.001 || Math.abs(nn.neural1d) < 0.002;
+  expected1d = 0.52 * linear1d + 0.48 * nn.neural1d;
+  expected5d = 0.52 * expected5d + 0.48 * nn.neural5d;
+
+  const hitRate = matches.length
+    ? matches.filter((m) => Math.sign(m.ret1d) === Math.sign(expected1d) || expected1d === 0).length /
+      matches.length
+    : 0.5;
+  const reversalRate = matches.length ? matches.filter((m) => m.reversed).length / matches.length : 0.4;
 
   let confidence =
     Math.min(1, matches.length / 6) * 0.35 +
@@ -122,6 +136,8 @@ export function recognize(
   if (config.skipEcho && echo) {
     confidence *= 0.55;
   }
+  if (net && neuralAgree) confidence = Math.min(1, confidence + 0.06);
+  if (net && !neuralAgree) confidence *= 0.9;
 
   let side: BehaviorForecast["side"] = "skip";
   if (confidence >= config.minConfidence && Math.abs(expected1d) >= config.minAbsMove) {
@@ -144,6 +160,10 @@ export function recognize(
     cascadeCount: recentSame.length,
     matches,
     side,
+    linear1d,
+    neural1d: nn.neural1d,
+    neural5d: nn.neural5d,
+    neuralAgree,
   };
 }
 

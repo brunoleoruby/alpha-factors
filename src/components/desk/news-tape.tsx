@@ -42,6 +42,7 @@ export function NewsTape({
                 <Badge variant="outline">{f.eventLabel}</Badge>
                 {f.cascade ? <Badge>cascade</Badge> : null}
                 {f.echo ? <Badge variant="secondary">echo</Badge> : null}
+                {f.neuralAgree ? <Badge variant="outline">NN</Badge> : null}
                 <Badge variant={f.side === "skip" ? "secondary" : "default"}>{f.side}</Badge>
               </div>
               <p className="mt-1 text-sm leading-snug">{item.headline}</p>

@@ -32,18 +32,28 @@ export function PatternInspector({
           <Badge variant="outline">intensity {(forecast.intensity * 100).toFixed(0)}%</Badge>
           {forecast.cascade ? <Badge>news cascade ×{forecast.cascadeCount + 1}</Badge> : null}
           {forecast.echo ? <Badge variant="secondary">repeat of a recent print</Badge> : null}
+          {forecast.neuralAgree ? (
+            <Badge>NN agrees</Badge>
+          ) : (
+            <Badge variant="secondary">NN diverges</Badge>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Expected 1d" value={formatPct(forecast.expected1d)} tone={forecast.expected1d} />
         <Stat label="Expected 5d" value={formatPct(forecast.expected5d)} tone={forecast.expected5d} />
+        <Stat label="Neighbor 1d" value={formatPct(forecast.linear1d)} tone={forecast.linear1d} />
+        <Stat label="Neural 1d" value={formatPct(forecast.neural1d)} tone={forecast.neural1d} />
         <Stat label="Hit rate" value={`${(forecast.hitRate * 100).toFixed(0)}%`} />
         <Stat label="Fade / reverse" value={`${(forecast.reversalRate * 100).toFixed(0)}%`} />
       </div>
       <p className="text-muted-foreground text-xs">
-        Forecast is a similarity-weighted average of the {forecast.sampleSize} closest past headlines
-        (TF-IDF cosine + event type). Confidence {(forecast.confidence * 100).toFixed(0)}% →{" "}
+        Neighbors are TF-IDF cosine rhymes (linear blend of past 1d paths). A small MLP, trained on
+        earlier labeled prints, maps non-linear sentiment and alternative-data flags (source, SEBI/RBI/FII
+        language, intensity) into its own 1d/5d move. The desk averages the two
+        {forecast.neuralAgree ? " — they agree on direction." : " — they disagree, so confidence is cut."}{" "}
+        Confidence {(forecast.confidence * 100).toFixed(0)}% →{" "}
         <span className="text-foreground font-medium">{forecast.side}</span>.
       </p>
 

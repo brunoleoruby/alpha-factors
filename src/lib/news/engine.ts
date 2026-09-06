@@ -3,6 +3,7 @@ import { generateCorpus, NSE_SOURCES, type NewsItem } from "./corpus";
 import type { Listing } from "@/lib/markets/types";
 import { US_LISTINGS } from "@/lib/markets/us";
 import { eventFingerprints, indexCorpus, recognize, type BehaviorForecast } from "./patterns";
+import { trainNewsNet, type NeuralFit } from "./nn";
 import { DEFAULT_STRATEGY, type StrategyConfig } from "./taxonomy";
 import { vectorize } from "./tfidf";
 
@@ -50,6 +51,7 @@ export type NewsState = {
   fingerprints: ReturnType<typeof eventFingerprints>;
   selectedId: string | null;
   listings: Listing[];
+  neural: NeuralFit;
 };
 
 function uniqueDates(corpus: NewsItem[]) {
@@ -96,7 +98,12 @@ export function createNewsState(
   const dates = uniqueDates(corpus);
   const warmup = Math.min(50, dates.length - 1);
   const book = new Map(listings.map((l) => [l.symbol, l]));
-  return simulateTo(corpus, dates, warmup, config, book);
+  const cutoff = dates[Math.min(40, warmup)];
+  const neural = trainNewsNet(
+    corpus.filter((n) => n.date < cutoff),
+    seed,
+  );
+  return simulateTo(corpus, dates, warmup, config, book, neural);
 }
 
 function simulateTo(
@@ -105,6 +112,7 @@ function simulateTo(
   asOfIndex: number,
   config: StrategyConfig,
   book: Map<string, Listing>,
+  neural: NeuralFit,
 ): NewsState {
   const space = indexCorpus(corpus);
   const analyzed: AnalyzedItem[] = [];
@@ -139,7 +147,7 @@ function simulateTo(
     });
 
     for (const item of todays) {
-      const forecast = recognize(item, history, space, config);
+      const forecast = recognize(item, history, space, config, neural.net);
       analyzed.push({ ...item, forecast });
       if (date < warmupDate) continue;
       if (forecast.side === "skip") continue;
@@ -169,7 +177,7 @@ function simulateTo(
         shares: Math.abs(shares),
         price: px,
         headline: item.headline,
-        reason: `${forecast.eventLabel} · ${(forecast.confidence * 100).toFixed(0)}% conf`,
+        reason: `${forecast.eventLabel} · ${(forecast.confidence * 100).toFixed(0)}% conf${forecast.neuralAgree ? " · NN agree" : ""}`,
         confidence: forecast.confidence,
       });
     }
@@ -198,6 +206,7 @@ function simulateTo(
     fingerprints: eventFingerprints(corpus.filter((n) => n.date <= dates[asOfIndex])),
     selectedId: tape[0]?.id ?? analyzed.at(-1)?.id ?? null,
     listings,
+    neural,
   };
 }
 
@@ -206,12 +215,12 @@ function bookFrom(state: NewsState) {
 }
 
 export function replayConfig(state: NewsState, config: StrategyConfig): NewsState {
-  return simulateTo(state.corpus, state.dates, state.asOfIndex, config, bookFrom(state));
+  return simulateTo(state.corpus, state.dates, state.asOfIndex, config, bookFrom(state), state.neural);
 }
 
 export function stepNews(state: NewsState, config: StrategyConfig): NewsState {
   if (state.asOfIndex >= state.dates.length - 1) return state;
-  return simulateTo(state.corpus, state.dates, state.asOfIndex + 1, config, bookFrom(state));
+  return simulateTo(state.corpus, state.dates, state.asOfIndex + 1, config, bookFrom(state), state.neural);
 }
 
 export function analyzeHeadline(
@@ -236,5 +245,5 @@ export function analyzeHeadline(
     vec: vectorize(space, classification),
   };
   const history = state.corpus.filter((n) => n.date <= date);
-  return { item, forecast: recognize(item, history, space, config) };
+  return { item, forecast: recognize(item, history, space, config, state.neural.net) };
 }

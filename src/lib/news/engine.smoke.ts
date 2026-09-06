@@ -42,6 +42,8 @@ if (!swings.some((s) => s.kind === "high" && s.price === 14)) {
 const loud = state.analyzed.find((a) => a.forecast.sampleSize >= 3);
 if (!loud) throw new Error("expected a print with historical neighbors");
 if (!Number.isFinite(loud.forecast.expected1d)) throw new Error("non-finite forecast");
+if (!Number.isFinite(loud.forecast.neural1d)) throw new Error("non-finite neural 1d");
+if (state.neural.samples < 20) throw new Error("neural net underfit");
 
 const next = state.asOfIndex;
 if (next < 0) throw new Error("bad asOf");
@@ -56,6 +58,8 @@ console.log(
       tickets: state.trades.length,
       fingerprints: state.fingerprints.length,
       nseNames: nse.listings.length,
+      neuralSamples: state.neural.samples,
+      neural1d: Number(loud.forecast.neural1d.toFixed(4)),
     },
     null,
     2,

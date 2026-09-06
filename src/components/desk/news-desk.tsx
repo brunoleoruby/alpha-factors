@@ -249,7 +249,7 @@ export function NewsDesk({
               {desk.scratch ? "Pasted headline" : "Pattern match"}
             </CardTitle>
             <CardDescription>
-              Neighbor search over prior sessions only — no peeking at the same-day print.
+              Neighbor search over prior sessions, plus a neural net on sentiment and alt-data flags.
             </CardDescription>
           </CardHeader>
           <CardContent>
