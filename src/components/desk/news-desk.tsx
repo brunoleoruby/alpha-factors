@@ -96,7 +96,11 @@ export function NewsDesk({
 
   const dd = last?.drawdown ?? 0;
   const traded = state.trades.filter((t) => t.confidence > 0).length;
-  const chartSymbol = selected?.item.symbol ?? desk.pasteSymbol;
+  const chartSymbol =
+    desk.scratch?.item.symbol ??
+    state.tape.find((t) => t.id === state.selectedId)?.symbol ??
+    state.analyzed.find((t) => t.id === state.selectedId)?.symbol ??
+    desk.pasteSymbol;
   const chartName = listings.find((l) => l.symbol === chartSymbol)?.name ?? chartSymbol;
 
   return (

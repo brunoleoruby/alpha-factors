@@ -6,6 +6,10 @@ import {
   ColorType,
   createChart,
   createSeriesMarkers,
+  type IChartApi,
+  type ISeriesApi,
+  type ISeriesMarkersPluginApi,
+  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { cn } from "cn";
@@ -28,6 +32,38 @@ function formatLast(n: number, currency: string) {
   return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 }
 
+function toBars(candles: Candle[]) {
+  return candles.map((c) => ({
+    time: c.time as UTCTimestamp,
+    open: c.open,
+    high: c.high,
+    low: c.low,
+    close: c.close,
+  }));
+}
+
+function toMarkers(candles: Candle[]) {
+  return findSwings(candles, 2).map((s) =>
+    s.kind === "high"
+      ? {
+          time: s.time as UTCTimestamp,
+          position: "atPriceTop" as const,
+          price: s.price,
+          color: "#d4bf8a",
+          shape: "circle" as const,
+          size: 0.9,
+        }
+      : {
+          time: s.time as UTCTimestamp,
+          position: "atPriceBottom" as const,
+          price: s.price,
+          color: "#3d9a78",
+          shape: "circle" as const,
+          size: 0.9,
+        },
+  );
+}
+
 export function TradingViewChart({
   symbol,
   locale,
@@ -43,6 +79,9 @@ export function TradingViewChart({
 }) {
   const tv = tradingViewSymbol(symbol, locale);
   const hostRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const [tf, setTf] = useState<TimeframeId>("1D");
   const [swingsOn, setSwingsOn] = useState(true);
   const [feed, setFeed] = useState<Feed | null>(null);
@@ -51,48 +90,12 @@ export function TradingViewChart({
   const requestKey = `${locale}:${symbol}:${tf}`;
 
   useEffect(() => {
-    let cancelled = false;
-    fetch(
-      `/api/ohlc?symbol=${encodeURIComponent(symbol)}&locale=${locale}&tf=${encodeURIComponent(tf)}`,
-    )
-      .then(async (res) => {
-        const body = (await res.json()) as Feed & { error?: string };
-        if (!res.ok) throw new Error(body.error ?? res.statusText);
-        if (!body.candles?.length) throw new Error("No candles returned");
-        if (!cancelled) {
-          setFeed(body);
-          setError(null);
-          setLoadedFor(requestKey);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setFeed(null);
-          setError(err instanceof Error ? err.message : "Chart feed failed");
-          setLoadedFor(requestKey);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [locale, requestKey, symbol, tf]);
-
-  const pending = loadedFor !== requestKey;
-  const status = pending ? "loading" : error ? "error" : "ready";
-  const swings = useMemo(
-    () => (feed?.candles.length ? findSwings(feed.candles, 2) : []),
-    [feed],
-  );
-  const highs = swings.filter((s) => s.kind === "high").length;
-  const lows = swings.filter((s) => s.kind === "low").length;
-
-  useEffect(() => {
     const host = hostRef.current;
-    if (!host || status !== "ready" || !feed?.candles.length) return;
+    if (!host) return;
 
-    const intraday = tf === "15m" || tf === "1h";
     const chart = createChart(host, {
-      autoSize: true,
+      width: host.clientWidth || 640,
+      height: host.clientHeight || 420,
       layout: {
         background: { type: ColorType.Solid, color: "#0d0d0c" },
         textColor: "#c4b89a",
@@ -105,7 +108,7 @@ export function TradingViewChart({
       rightPriceScale: { borderColor: "rgba(212, 191, 138, 0.2)" },
       timeScale: {
         borderColor: "rgba(212, 191, 138, 0.2)",
-        timeVisible: intraday,
+        timeVisible: false,
         secondsVisible: false,
       },
       crosshair: { mode: 0 },
@@ -118,53 +121,85 @@ export function TradingViewChart({
       wickUpColor: "#3d9a78",
       wickDownColor: "#a33a4a",
     });
-    series.setData(
-      feed.candles.map((c) => ({
-        time: c.time as UTCTimestamp,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-      })),
-    );
-    if (swingsOn) {
-      createSeriesMarkers(
-        series,
-        swings.map((s) =>
-          s.kind === "high"
-            ? {
-                time: s.time as UTCTimestamp,
-                position: "atPriceTop" as const,
-                price: s.price,
-                color: "#d4bf8a",
-                shape: "circle" as const,
-                size: 0.9,
-              }
-            : {
-                time: s.time as UTCTimestamp,
-                position: "atPriceBottom" as const,
-                price: s.price,
-                color: "#3d9a78",
-                shape: "circle" as const,
-                size: 0.9,
-              },
-        ),
-      );
-    }
-    chart.timeScale().fitContent();
-    return () => {
-      chart.remove();
-    };
-  }, [feed, status, swings, swingsOn, tf]);
+    const markers = createSeriesMarkers(series, []);
+    chartRef.current = chart;
+    seriesRef.current = series;
+    markersRef.current = markers;
 
-  const message = pending ? `Loading ${tf} candles…` : (error ?? "Loading candles…");
+    let lastW = 0;
+    let lastH = 0;
+    const resize = () => {
+      if (!hostRef.current || !chartRef.current) return;
+      const { clientWidth, clientHeight } = hostRef.current;
+      if (clientWidth < 2 || clientHeight < 2) return;
+      if (clientWidth === lastW && clientHeight === lastH) return;
+      lastW = clientWidth;
+      lastH = clientHeight;
+      chartRef.current.applyOptions({ width: clientWidth, height: clientHeight });
+    };
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(host);
+
+    return () => {
+      ro.disconnect();
+      chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+      markersRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    fetch(
+      `/api/ohlc?symbol=${encodeURIComponent(symbol)}&locale=${locale}&tf=${encodeURIComponent(tf)}`,
+      { signal: ac.signal },
+    )
+      .then(async (res) => {
+        const body = (await res.json()) as Feed & { error?: string };
+        if (!res.ok) throw new Error(body.error ?? res.statusText);
+        if (!body.candles?.length) throw new Error("No candles returned");
+        setFeed(body);
+        setError(null);
+        setLoadedFor(`${locale}:${symbol}:${tf}`);
+      })
+      .catch((err: unknown) => {
+        if (ac.signal.aborted) return;
+        setError(err instanceof Error ? err.message : "Chart feed failed");
+        setLoadedFor(`${locale}:${symbol}:${tf}`);
+      });
+    return () => ac.abort();
+  }, [locale, symbol, tf]);
+
+  useEffect(() => {
+    const series = seriesRef.current;
+    const chart = chartRef.current;
+    const markers = markersRef.current;
+    if (!series || !chart || !feed?.candles.length) return;
+    series.setData(toBars(feed.candles));
+    markers?.setMarkers(swingsOn ? toMarkers(feed.candles) : []);
+    chart.applyOptions({
+      timeScale: { timeVisible: tf === "15m" || tf === "1h", secondsVisible: false },
+    });
+    chart.timeScale().fitContent();
+  }, [feed, swingsOn, tf]);
+
+  const pending = loadedFor !== requestKey;
+  const hasChart = Boolean(feed?.candles.length) && !error;
+  const swings = useMemo(
+    () => (feed?.candles.length ? findSwings(feed.candles, 2) : []),
+    [feed],
+  );
+  const highs = swings.filter((s) => s.kind === "high").length;
+  const lows = swings.filter((s) => s.kind === "low").length;
 
   return (
     <div className={cn("overflow-hidden rounded-xl border border-primary/15 bg-[#0d0d0c]", className)}>
       <div className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-primary font-mono text-sm">
           {name ?? symbol} · {tv}
-          {feed?.last != null && loadedFor === requestKey ? (
+          {feed?.last != null && !pending ? (
             <span className="text-foreground ml-2">{formatLast(feed.last, feed.currency)}</span>
           ) : null}
         </p>
@@ -193,15 +228,16 @@ export function TradingViewChart({
             )}
             title="Mark swing highs and lows on this timeframe"
           >
-            Swings{swingsOn && status === "ready" ? ` ${highs}H/${lows}L` : ""}
+            Swings{swingsOn && hasChart && !pending ? ` ${highs}/${lows}` : ""}
           </button>
         </div>
       </div>
-      {status !== "ready" ? (
-        <div className={cn("text-muted-foreground flex items-center justify-center px-4 text-sm", heightClassName)}>
-          <div className="max-w-md text-center">
-            <p>{message}</p>
-            {status === "error" ? (
+      <div className={cn("relative w-full", heightClassName)}>
+        <div ref={hostRef} className="absolute inset-0" />
+        {error && !pending ? (
+          <div className="bg-background/80 absolute inset-0 flex items-center justify-center px-4 text-center text-sm">
+            <div>
+              <p className="text-muted-foreground">{error}</p>
               <a
                 href={`https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tv)}`}
                 target="_blank"
@@ -210,12 +246,15 @@ export function TradingViewChart({
               >
                 Open {tv} on TradingView
               </a>
-            ) : null}
+            </div>
           </div>
-        </div>
-      ) : (
-        <div ref={hostRef} className={cn("w-full", heightClassName)} />
-      )}
+        ) : null}
+        {pending && !error ? (
+          <div className="text-muted-foreground pointer-events-none absolute inset-x-0 top-2 text-center text-xs">
+            Loading {tf}…
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
