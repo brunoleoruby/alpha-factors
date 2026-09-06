@@ -80,6 +80,11 @@ export function NseSubnav() {
         { href: "/nse", label: "Pattern desk", active: (p) => p === "/nse" },
         { href: "/nse/stocks", label: "All stocks", active: (p) => p.startsWith("/nse/stocks") },
         { href: "/nse/cases/polycab", label: "Polycab case", active: (p) => p.startsWith("/nse/cases") },
+        {
+          href: "/nse/environment",
+          label: "Market environment",
+          active: (p) => p.startsWith("/nse/environment"),
+        },
       ]}
     />
   );
@@ -91,6 +96,7 @@ export function UsSubnav() {
       items={[
         { href: "/", label: "Pattern desk", active: (p) => p === "/" },
         { href: "/stocks", label: "All stocks", active: (p) => p.startsWith("/stocks") },
+        { href: "/environment", label: "Market environment", active: (p) => p.startsWith("/environment") },
       ]}
     />
   );
