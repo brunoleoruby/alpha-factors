@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,12 +12,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatInrFine } from "@/lib/format";
-import type { Listing } from "@/lib/markets/types";
+import { formatInrFine, formatUsdFine } from "@/lib/format";
+import type { ExchangeId, Listing } from "@/lib/markets/types";
+import { chartPath } from "@/lib/markets/tv";
 
-export function AllStocksTable({ listings }: { listings: Listing[] }) {
+export function AllStocksTable({
+  listings,
+  locale,
+}: {
+  listings: Listing[];
+  locale: ExchangeId;
+}) {
   const [q, setQ] = useState("");
   const [sector, setSector] = useState("All");
+  const moneyFine = locale === "NSE" ? formatInrFine : formatUsdFine;
   const sectors = useMemo(
     () => ["All", ...[...new Set(listings.map((l) => l.sector))].sort()],
     [listings],
@@ -37,10 +46,12 @@ export function AllStocksTable({ listings }: { listings: Listing[] }) {
   return (
     <Card className="border-primary/15 bg-card/90 mx-auto mt-4 w-full max-w-[1600px]">
       <CardHeader>
-        <CardTitle className="font-heading text-2xl">NSE all stocks</CardTitle>
+        <CardTitle className="font-heading text-2xl">
+          {locale === "NSE" ? "NSE all stocks" : "US all stocks"}
+        </CardTitle>
         <CardDescription>
-          {listings.length} cash-equity names on this desk (Nifty 50, Next 50, and broad mid/small
-          coverage). Search or filter by sector. Prices are simulated marks, not live NSE LTP.
+          {listings.length} names. Open any row for the TradingView chart. Desk reference prices are
+          simulated; the chart is live market data from TradingView.
         </CardDescription>
         <div className="flex flex-col gap-2 pt-2 sm:flex-row">
           <Input
@@ -74,26 +85,36 @@ export function AllStocksTable({ listings }: { listings: Listing[] }) {
                 <TableHead>Exchange</TableHead>
                 <TableHead>Series</TableHead>
                 <TableHead className="text-right">Ref. price</TableHead>
+                <TableHead className="text-right">Chart</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground">
+                  <TableCell colSpan={7} className="text-muted-foreground">
                     No names match that search.
                   </TableCell>
                 </TableRow>
               ) : (
                 rows.map((l) => (
-                <TableRow key={l.symbol}>
-                  <TableCell className="font-mono font-medium">{l.symbol}</TableCell>
-                  <TableCell>{l.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{l.sector}</TableCell>
-                  <TableCell>NSE</TableCell>
-                  <TableCell>EQ</TableCell>
-                  <TableCell className="text-right font-mono">{formatInrFine(l.startPrice)}</TableCell>
-                </TableRow>
-              ))
+                  <TableRow key={l.symbol}>
+                    <TableCell className="font-mono font-medium">
+                      <Link href={chartPath(l.symbol, locale)} className="hover:text-primary underline-offset-4 hover:underline">
+                        {l.symbol}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{l.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{l.sector}</TableCell>
+                    <TableCell>{locale}</TableCell>
+                    <TableCell>{locale === "NSE" ? "EQ" : "Common"}</TableCell>
+                    <TableCell className="text-right font-mono">{moneyFine(l.startPrice)}</TableCell>
+                    <TableCell className="text-right">
+                      <Link href={chartPath(l.symbol, locale)} className="text-primary text-sm hover:underline">
+                        TradingView
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>

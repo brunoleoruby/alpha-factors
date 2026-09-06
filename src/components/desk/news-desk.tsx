@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import Link from "next/link";
 import { EquityChart } from "@/components/desk/equity-chart";
+import { TradingViewChart } from "@/components/desk/tradingview-chart";
 import { NewsControls } from "@/components/desk/news-controls";
 import { NewsTape } from "@/components/desk/news-tape";
 import { PatternInspector } from "@/components/desk/pattern-inspector";
@@ -34,6 +36,7 @@ import { DEFAULT_STRATEGY } from "@/lib/news/taxonomy";
 import { US_LISTINGS } from "@/lib/markets/us";
 import type { Listing } from "@/lib/markets/types";
 import type { ExchangeId } from "@/lib/markets/types";
+import { chartPath } from "@/lib/markets/tv";
 
 export function NewsDesk({
   locale = "US",
@@ -93,6 +96,8 @@ export function NewsDesk({
 
   const dd = last?.drawdown ?? 0;
   const traded = state.trades.filter((t) => t.confidence > 0).length;
+  const chartSymbol = selected?.item.symbol ?? desk.pasteSymbol;
+  const chartName = listings.find((l) => l.symbol === chartSymbol)?.name ?? chartSymbol;
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
@@ -252,6 +257,30 @@ export function NewsDesk({
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-primary/15 bg-card/90">
+        <CardHeader className="pb-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <CardTitle className="text-base">TradingView · {chartSymbol}</CardTitle>
+              <CardDescription>
+                Live candles for the name on the selected print (or the paste box).{" "}
+                <Link href={chartPath(chartSymbol, locale)} className="text-primary hover:underline">
+                  Open full chart
+                </Link>
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <TradingViewChart
+            symbol={chartSymbol}
+            locale={locale}
+            name={chartName}
+            heightClassName="h-[380px] md:h-[480px]"
+          />
+        </CardContent>
+      </Card>
 
       <Card className="border-primary/15 bg-card/90">
         <Tabs defaultValue="events">

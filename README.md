@@ -80,4 +80,7 @@ Then open http://127.0.0.1:43123 — same engine, in a tab.
 
 - **US** — `/` — US names, USD paper book.
 - **NSE** — `/nse` — National Stock Exchange of India, rupee paper book, Indian headline templates (SEBI, RBI, QIP).
-- **All stocks** — `/nse/stocks` — searchable directory of every NSE name on this desk (Nifty 50, Next 50, and broad mid/small coverage). Simulated reference prices, not live LTP.
+- **All stocks (US)** — `/stocks` — directory plus a TradingView chart page per name (`/stocks/AAPL`).
+- **All stocks (NSE)** — `/nse/stocks` — searchable directory; each name opens `/nse/stocks/RELIANCE` with a TradingView chart.
+
+Charts load live candles from TradingView (needs internet). Paper NAV and news tape stay simulated.

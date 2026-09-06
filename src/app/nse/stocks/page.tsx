@@ -12,11 +12,11 @@ export default function NseStocksPage() {
           All stocks
         </h1>
         <p className="text-muted-foreground mt-1 max-w-2xl text-sm leading-relaxed">
-          Every name on this NSE desk, on its own page. Search the book, then switch to Pattern desk
-          to paste a headline against any symbol.
+          Every name on this NSE desk. Open a symbol for its TradingView chart, or search the book
+          then switch to Pattern desk to paste a headline.
         </p>
       </header>
-      <AllStocksTable listings={NSE_LISTINGS} />
+      <AllStocksTable listings={NSE_LISTINGS} locale="NSE" />
     </div>
   );
 }
