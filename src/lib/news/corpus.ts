@@ -87,6 +87,12 @@ const TEMPLATES: Record<EventType, string[]> = {
     "Tariff risk rises for {symbol} {thing} exports",
     "FTC antitrust ruling lands against {name}",
   ],
+  insider_trading: [
+    "SEBI issues interim order in insider trading case involving {name} {thing}",
+    "Probe into unpublished price-sensitive information leak ahead of {name} {thing} print",
+    "{symbol} connected persons face insider-trading allegations under PIT regulations",
+    "SEC charges connected persons with insider trading ahead of {name} {thing} print",
+  ],
   macro: [
     "Inflation data, CPI print reshapes rate-cut bets; {symbol} in focus",
     "Federal Reserve signals path for rates; {thing} names react including {name}",
@@ -188,8 +194,12 @@ export function generateCorpus(options: CorpusOptions = {}): NewsItem[] {
             ...templates,
           ];
         }
-        if (rule.id === "offering") {
-          templates = ["{name} prices QIP of shares", "{symbol} launches dilutive offering", ...templates];
+        if (rule.id === "insider_trading") {
+          templates = [
+            "SEBI PIT notice on {name} promoters over alleged insider trading in {thing}",
+            "Insider-trading issue: unpublished price-sensitive information leak tied to {symbol}",
+            ...templates,
+          ];
         }
       }
       const headline = fill(

@@ -15,17 +15,17 @@ import {
 import { formatPct, pnlClass } from "@/lib/format";
 import {
   CASE_CATEGORIES,
-  POLYCAB_LABELED,
-  POLYCAB_PRICE,
-  SIMILAR_LABELED,
-  categoriesInPlay,
+  INFY_PRICE,
+  INSIDER_LABELED,
+  SIMILAR_INSIDER_LABELED,
+  insiderCategoriesInPlay,
   type LabeledPrint,
-} from "@/lib/news/cases/polycab";
+} from "@/lib/news/cases/insider-trading";
 import type { EventType } from "@/lib/news/taxonomy";
 import { cn } from "cn";
 
 function PricePath() {
-  const marks = POLYCAB_PRICE;
+  const marks = INFY_PRICE;
   const values = marks.map((m) => m.close);
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -48,7 +48,7 @@ function PricePath() {
     .join(" ");
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="h-52 w-full" role="img" aria-label="Polycab NSE close Dec 2023 to Jan 2024">
+    <svg viewBox={`0 0 ${w} ${h}`} className="h-52 w-full" role="img" aria-label="Infosys NSE close late May to early June 2021">
       <path d={d} fill="none" stroke="#d4bf8a" strokeWidth="2.2" />
       {marks.map((m, i) => {
         const [x, y] = xy(i, m.close);
@@ -59,7 +59,7 @@ function PricePath() {
               {m.date.slice(5)}
             </text>
             {m.label ? (
-            <text x={x} y={Math.max(12, y - 8)} textAnchor="middle" className="fill-primary" fontSize="9">
+              <text x={x} y={Math.max(12, y - 8)} textAnchor="middle" className="fill-primary" fontSize="9">
                 {m.label}
               </text>
             ) : null}
@@ -80,30 +80,32 @@ function PrintTable({ rows }: { rows: LabeledPrint[] }) {
         <TableHeader>
           <TableRow>
             <TableHead>Date</TableHead>
-            <TableHead>Category</TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Headline</TableHead>
+            <TableHead>Category</TableHead>
             <TableHead className="text-right">1d</TableHead>
             <TableHead className="text-right">5d</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r) => (
-            <TableRow key={`${r.symbol}-${r.date}-${r.headline.slice(0, 24)}`}>
-              <TableCell className="font-mono text-xs whitespace-nowrap">{r.date}</TableCell>
+          {rows.map((row) => (
+            <TableRow key={`${row.date}-${row.symbol}-${row.headline.slice(0, 24)}`}>
+              <TableCell className="font-mono text-xs whitespace-nowrap">{row.date}</TableCell>
               <TableCell>
-                <Badge variant="outline">{r.eventLabel}</Badge>
+                <Link href={`/nse/stocks/${row.symbol}`} className="text-primary hover:underline">
+                  {row.symbol}
+                </Link>
+                <p className="text-muted-foreground text-xs">{row.name}</p>
               </TableCell>
-              <TableCell className="font-medium">
-                <span className="font-mono text-xs">{r.symbol}</span>
-                <span className="text-muted-foreground mt-0.5 block text-xs">{r.name}</span>
+              <TableCell className="max-w-md text-sm">
+                {row.headline}
+                <p className="text-muted-foreground mt-1 text-xs">{row.note}</p>
               </TableCell>
-              <TableCell className="max-w-md text-xs leading-snug">
-                {r.headline}
-                <span className="text-muted-foreground mt-1 block">{r.note}</span>
+              <TableCell>
+                <Badge variant="outline">{row.eventLabel}</Badge>
               </TableCell>
-              <TableCell className={`text-right font-mono ${pnlClass(r.ret1d)}`}>{formatPct(r.ret1d)}</TableCell>
-              <TableCell className={`text-right font-mono ${pnlClass(r.ret5d)}`}>{formatPct(r.ret5d)}</TableCell>
+              <TableCell className={`text-right font-mono ${pnlClass(row.ret1d)}`}>{formatPct(row.ret1d)}</TableCell>
+              <TableCell className={`text-right font-mono ${pnlClass(row.ret5d)}`}>{formatPct(row.ret5d)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -112,40 +114,43 @@ function PrintTable({ rows }: { rows: LabeledPrint[] }) {
   );
 }
 
-export function PolycabCaseStudy() {
+export function InsiderTradingCaseStudy() {
   const [cat, setCat] = useState<"all" | EventType>("all");
-  const inPlay = categoriesInPlay();
-  const polycabRows = useMemo(
-    () => (cat === "all" ? POLYCAB_LABELED : POLYCAB_LABELED.filter((p) => p.eventType === cat)),
+  const inPlay = insiderCategoriesInPlay();
+  const ownRows = useMemo(
+    () => (cat === "all" ? INSIDER_LABELED : INSIDER_LABELED.filter((p) => p.eventType === cat)),
     [cat],
   );
   const rhymeRows = useMemo(
-    () => (cat === "all" ? SIMILAR_LABELED : SIMILAR_LABELED.filter((p) => p.eventType === cat)),
+    () =>
+      cat === "all" ? SIMILAR_INSIDER_LABELED : SIMILAR_INSIDER_LABELED.filter((p) => p.eventType === cat),
     [cat],
   );
-  const first = POLYCAB_PRICE[0].close;
-  const crash = POLYCAB_PRICE.find((p) => p.date === "2024-01-11")!.close;
-  const earn = POLYCAB_PRICE.find((p) => p.date === "2024-01-18")!.close;
+  const first = INFY_PRICE[0].close;
+  const printDay = INFY_PRICE.find((p) => p.date === "2021-06-02")!.close;
+  const typical = CASE_CATEGORIES.find((c) => c.id === "insider_trading")!;
 
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-4 pb-10 md:px-6">
       <header className="mt-2">
         <p className="text-primary text-xs font-medium tracking-[0.22em] uppercase">Worked example · NSE</p>
         <h1 className="font-heading mt-1 text-3xl font-semibold tracking-tight md:text-4xl">
-          Polycab · Dec 2023 – Jan 2024
+          Insider trading · PIT / UPSI
         </h1>
         <p className="text-muted-foreground mt-2 max-w-3xl text-sm leading-relaxed">
-          One name, one window. Classify each headline, list every category this desk knows, then rhyme
-          the same event type in other stocks and read the 1-day / 5-day path. Dates and closes below
-          follow public reports (IT search, CBDT note, Q3 print). Not a live feed.
+          Separate event from a tax raid or a generic SEBI review. The desk now tags headlines that name
+          insider trading, unpublished price-sensitive information, connected persons, or PIT regulations,
+          and fingerprints them at about {formatPct(typical.typical1d)} 1-day / {formatPct(typical.typical5d)}{" "}
+          5-day. Infosys in June 2021 is the large-cap version: SEBI interim order, company probe, a
+          sub-1% close, then SAT and a 2024 dismissal. Not a live feed.
         </p>
         <p className="mt-2 text-sm">
-          <Link href="/nse/stocks/POLYCAB" className="text-primary hover:underline">
-            Open POLYCAB chart
+          <Link href="/nse/stocks/INFY" className="text-primary hover:underline">
+            Open INFY chart
           </Link>
           <span className="text-muted-foreground"> · </span>
-          <Link href="/nse/cases/insider" className="text-primary hover:underline">
-            Insider trading case
+          <Link href="/nse/cases/polycab" className="text-primary hover:underline">
+            Polycab raid case
           </Link>
           <span className="text-muted-foreground"> · </span>
           <Link href="/nse" className="text-primary hover:underline">
@@ -155,16 +160,19 @@ export function PolycabCaseStudy() {
       </header>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Kpi label="21 Dec close" value={`₹${first.toLocaleString("en-IN")}`} />
-        <Kpi label="11 Jan (CBDT)" value={`₹${crash.toLocaleString("en-IN")}`} tone={crash / first - 1} />
-        <Kpi label="Move into crash" value={formatPct(crash / first - 1)} tone={crash / first - 1} />
-        <Kpi label="18 Jan (results)" value={`₹${earn.toLocaleString("en-IN")}`} />
+        <Kpi label="28 May close" value={`₹${first.toLocaleString("en-IN")}`} />
+        <Kpi label="2 Jun NSE close" value={`₹${printDay.toLocaleString("en-IN")}`} tone={printDay / first - 1} />
+        <Kpi label="Move in window" value={formatPct(printDay / first - 1)} tone={printDay / first - 1} />
+        <Kpi label="Typical PIT 1d" value={formatPct(typical.typical1d)} tone={typical.typical1d} />
       </div>
 
       <Card className="border-primary/15 bg-card/90">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Price through the window</CardTitle>
-          <CardDescription>NSE-style closes stitched from reported levels. Dots mark the news days.</CardDescription>
+          <CardTitle className="text-base">Price through the June 2021 window</CardTitle>
+          <CardDescription>
+            Stitched NSE-style closes. 2 Jun close follows contemporaneous reports (~₹1,381, −0.45%). SAT
+            and the 2024 dismissal are later prints, not on this chart.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <PricePath />
@@ -175,8 +183,8 @@ export function PolycabCaseStudy() {
         <CardHeader>
           <CardTitle className="text-base">News categories this desk uses</CardTitle>
           <CardDescription>
-            Full list. Gold outline = showed up in the Polycab window. Typical 1d is the fingerprint the
-            matcher starts from, not this episode’s print.
+            Gold outline = showed up on the Infosys PIT prints. Typical 1d is the fingerprint, not this
+            episode’s −0.5% close.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -236,14 +244,14 @@ export function PolycabCaseStudy() {
 
       <Card className="border-primary/15 bg-card/90">
         <CardHeader>
-          <CardTitle className="text-base">Polycab prints</CardTitle>
+          <CardTitle className="text-base">Infosys prints</CardTitle>
           <CardDescription>
-            Each row is classified by the same keyword rules as the live desk (legal / probe, earnings
-            beat, analyst upgrade, …).
+            Same keyword rules as the live desk. A SEBI review without PIT language still lands on
+            Regulation; a raid still lands on Legal.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <PrintTable rows={polycabRows} />
+          <PrintTable rows={ownRows} />
         </CardContent>
       </Card>
 
@@ -251,9 +259,8 @@ export function PolycabCaseStudy() {
         <CardHeader>
           <CardTitle className="text-base">Similar events in other stocks</CardTitle>
           <CardDescription>
-            Same category, different name. Compare 1d and 5d. Mankind’s raid barely stuck; Ashoka and
-            Adani rhymed with Polycab’s −21% legal day. KEI’s beat rallied; Infosys’s beat sold — the
-            rhyme for Polycab’s results that did not gap up. Infosys June 2021 is a PIT print, not a raid.
+            Polycab and Ashoka are raids. Adani is a probe. Reliance is a large-cap PIT analog. TCS is a
+            clean IT beat. Filter by category to keep those rhymes from mixing.
           </CardDescription>
         </CardHeader>
         <CardContent>

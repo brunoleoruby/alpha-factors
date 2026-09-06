@@ -79,7 +79,8 @@ export function NseSubnav() {
       items={[
         { href: "/nse", label: "Pattern desk", active: (p) => p === "/nse" },
         { href: "/nse/stocks", label: "All stocks", active: (p) => p.startsWith("/nse/stocks") },
-        { href: "/nse/cases/polycab", label: "Polycab case", active: (p) => p.startsWith("/nse/cases") },
+        { href: "/nse/cases/polycab", label: "Polycab case", active: (p) => p.startsWith("/nse/cases/polycab") },
+        { href: "/nse/cases/insider", label: "Insider trading", active: (p) => p.startsWith("/nse/cases/insider") },
         {
           href: "/nse/environment",
           label: "Market environment",

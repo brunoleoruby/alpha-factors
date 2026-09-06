@@ -39,6 +39,8 @@ const NEG = [
   "ban",
   "plunge",
   "plunges",
+  "insider",
+  "upsi",
 ];
 
 export type Classification = {
@@ -84,7 +86,7 @@ export function classifyHeadline(headline: string): Classification {
     if (POS.includes(t)) sent += 1;
     if (NEG.includes(t)) sent -= 1;
   }
-  if (eventType.includes("miss") || eventType.includes("cut") || eventType === "legal" || eventType === "outage" || eventType === "offering" || eventType === "analyst_downgrade") {
+  if (eventType.includes("miss") || eventType.includes("cut") || eventType === "legal" || eventType === "outage" || eventType === "offering" || eventType === "analyst_downgrade" || eventType === "insider_trading") {
     sent -= 0.6;
   }
   if (eventType.includes("beat") || eventType.includes("raise") || eventType === "buyback" || eventType === "mna" || eventType === "analyst_upgrade") {

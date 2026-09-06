@@ -13,6 +13,7 @@ export const EVENT_TYPES = [
   "offering",
   "workforce",
   "regulation",
+  "insider_trading",
   "macro",
 ] as const;
 
@@ -154,6 +155,28 @@ export const EVENT_RULES: EventRule[] = [
     typical1d: -0.007,
     typical5d: -0.006,
     reversal: 0.4,
+  },
+  {
+    id: "insider_trading",
+    label: "Insider trading",
+    description:
+      "SEBI/PIT, UPSI leak, or insider-trading order. Usually a sharp gap-down that can keep bleeding while the probe is live.",
+    keywords: [
+      "insider trading",
+      "insider-trading",
+      "unpublished price",
+      "upsi",
+      "pit regulations",
+      "insider information",
+      "connected persons",
+      "sebi interim order",
+      "interim ex-parte",
+      "prohibition of insider",
+      "alleged insider",
+    ],
+    typical1d: -0.024,
+    typical5d: -0.031,
+    reversal: 0.24,
   },
   {
     id: "macro",

@@ -2,6 +2,7 @@ import { NSE_LISTINGS } from "../markets/nse";
 import { findSwings } from "../markets/swings";
 import type { Candle } from "../markets/tv";
 import { classifyHeadline } from "./classify";
+import { INSIDER_LABELED } from "./cases/insider-trading";
 import { createNewsState } from "./engine";
 import { DEFAULT_STRATEGY, DEFAULT_STRATEGY_NSE } from "./taxonomy";
 
@@ -18,6 +19,22 @@ if (miss.eventType !== "earnings_miss") {
 const cut = classifyHeadline("Microsoft cuts guidance on softer cloud trends");
 if (cut.eventType !== "guidance_cut") {
   throw new Error(`expected guidance_cut, got ${cut.eventType}`);
+}
+
+const pit = classifyHeadline(
+  "SEBI issues interim order in alleged insider trading; unpublished price-sensitive information leak under PIT regulations",
+);
+if (pit.eventType !== "insider_trading") {
+  throw new Error(`expected insider_trading, got ${pit.eventType}`);
+}
+
+const sebiReview = classifyHeadline("SEBI opens review of Reliance refining practices");
+if (sebiReview.eventType !== "regulation") {
+  throw new Error(`expected regulation, got ${sebiReview.eventType}`);
+}
+
+if (!INSIDER_LABELED.length || INSIDER_LABELED.some((p) => p.eventType !== "insider_trading")) {
+  throw new Error("expected Infosys PIT prints to classify as insider_trading");
 }
 
 const state = createNewsState(DEFAULT_STRATEGY);

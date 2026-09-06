@@ -157,6 +157,28 @@ export const SIMILAR_EVENTS: CasePrint[] = [
     ret5d: -0.011,
     note: "Earnings beat that sold off — useful rhyme for Polycab’s 18 Jan print (beat, no gap-up).",
   },
+  {
+    date: "2021-06-02",
+    symbol: "INFY",
+    name: "Infosys",
+    headline:
+      "SEBI interim ex-parte order in alleged insider trading; unpublished price-sensitive information around Infosys quarterly results; PIT restrictions on employees and connected persons",
+    source: "SEBI / exchange",
+    ret1d: -0.0055,
+    ret5d: 0.008,
+    note: "Insider-trading issue, not a tax raid. Large-cap PIT print: about −0.5% close the session after the order, not a −21% legal crash.",
+  },
+  {
+    date: "2024-02-08",
+    symbol: "RELIANCE",
+    name: "Reliance Industries",
+    headline:
+      "Connected persons face insider-trading allegations under PIT regulations ahead of a refining print",
+    source: "Desk analog",
+    ret1d: -0.018,
+    ret5d: -0.022,
+    note: "How an insider-trading print typically hits a large cap: milder than Polycab’s −21% legal day.",
+  },
 ];
 
 function labelAll(rows: CasePrint[]): LabeledPrint[] {
