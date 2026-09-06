@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { NSE_LISTINGS } from "@/lib/markets/nse";
 import { US_LISTINGS } from "@/lib/markets/us";
-import { yahooSymbol } from "@/lib/markets/tv";
+import { yahooSymbol, timeframeById } from "@/lib/markets/tv";
 import type { Candle } from "@/lib/markets/tv";
 import type { ExchangeId } from "@/lib/markets/types";
 
@@ -26,7 +26,8 @@ export async function GET(req: NextRequest) {
   }
 
   const ysym = yahooSymbol(symbol, locale);
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ysym)}?range=1y&interval=1d`;
+  const frame = timeframeById(req.nextUrl.searchParams.get("tf") ?? "1D");
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ysym)}?range=${frame.range}&interval=${frame.interval}`;
   const res = await fetch(url, {
     headers: {
       Accept: "application/json",
@@ -68,6 +69,7 @@ export async function GET(req: NextRequest) {
     exchange: result.meta?.exchangeName ?? locale,
     currency: result.meta?.currency ?? (locale === "NSE" ? "INR" : "USD"),
     last: result.meta?.regularMarketPrice ?? candles.at(-1)?.close ?? null,
+    timeframe: frame.id,
     candles,
   });
 }

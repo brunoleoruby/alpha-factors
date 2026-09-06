@@ -83,4 +83,4 @@ Then open http://127.0.0.1:43123 — same engine, in a tab.
 - **All stocks (US)** — `/stocks` — directory plus a TradingView chart page per name (`/stocks/AAPL`).
 - **All stocks (NSE)** — `/nse/stocks` — searchable directory; each name opens `/nse/stocks/RELIANCE` with a TradingView chart.
 
-Charts: US names use the TradingView embed. NSE cash names are blocked on that public widget, so they plot with TradingView Lightweight Charts from a live quote feed, plus a link to open the same ticker on TradingView.com.
+Charts use TradingView Lightweight Charts for every name. Switch 15m / 1H / 1D / 1W / 1M and use **Swings** to mark fractal highs (H) and lows (L) on that timeframe. NSE cash names cannot use TradingView’s public embed; Open on TradingView still goes to the full site.

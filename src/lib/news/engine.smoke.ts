@@ -1,4 +1,6 @@
 import { NSE_LISTINGS } from "../markets/nse";
+import { findSwings } from "../markets/swings";
+import type { Candle } from "../markets/tv";
 import { classifyHeadline } from "./classify";
 import { createNewsState } from "./engine";
 import { DEFAULT_STRATEGY, DEFAULT_STRATEGY_NSE } from "./taxonomy";
@@ -24,6 +26,18 @@ if (!state.tape.length) throw new Error("expected today's tape");
 const nse = createNewsState(DEFAULT_STRATEGY_NSE, { listings: NSE_LISTINGS, locale: "NSE" });
 if (nse.listings.length < 50) throw new Error("expected a broad NSE book");
 if (!nse.tape.length) throw new Error("expected NSE tape");
+
+const hill: Candle[] = [
+  { time: 1, open: 10, high: 10, low: 9, close: 10 },
+  { time: 2, open: 10, high: 11, low: 9, close: 10 },
+  { time: 3, open: 10, high: 14, low: 10, close: 12 },
+  { time: 4, open: 12, high: 12, low: 9, close: 10 },
+  { time: 5, open: 10, high: 11, low: 8, close: 9 },
+];
+const swings = findSwings(hill, 2);
+if (!swings.some((s) => s.kind === "high" && s.price === 14)) {
+  throw new Error("expected a swing high at 14");
+}
 
 const loud = state.analyzed.find((a) => a.forecast.sampleSize >= 3);
 if (!loud) throw new Error("expected a print with historical neighbors");

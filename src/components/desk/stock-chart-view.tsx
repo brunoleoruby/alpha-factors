@@ -47,11 +47,11 @@ export function StockChartView({
       <p className="text-muted-foreground text-xs">
         {locale === "NSE" ? (
           <>
-            NSE cash names are blocked on TradingView&apos;s public embed (it falls back to AAPL). This
-            page plots live NSE candles in TradingView Lightweight Charts.{" "}
+            NSE cash names are blocked on TradingView&apos;s public embed. Charts here use
+            TradingView Lightweight Charts with a Swings tool (H/L) on every timeframe.{" "}
           </>
         ) : (
-          <>Live candles from the TradingView widget. </>
+          <>Live candles with swing high / low marks on each timeframe. </>
         )}
         <a
           href={`https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tv)}`}

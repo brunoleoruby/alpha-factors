@@ -265,8 +265,8 @@ export function NewsDesk({
               <CardTitle className="text-base">TradingView · {chartSymbol}</CardTitle>
               <CardDescription>
                 {locale === "NSE"
-                  ? "NSE names plot as live candles here. TradingView’s public embed cannot show Indian cash equity, so US names keep the TradingView widget."
-                  : "Live TradingView widget for the name on the selected print (or the paste box)."}{" "}
+                  ? "Live NSE candles with swing highs and lows on every timeframe."
+                  : "Live candles with swing highs and lows on every timeframe."}{" "}
                 <Link href={chartPath(chartSymbol, locale)} className="text-primary hover:underline">
                   Open full chart
                 </Link>
