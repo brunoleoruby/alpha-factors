@@ -46,7 +46,15 @@ export function StockChartView({
       />
       <p className="text-muted-foreground text-xs">
         Live candles come from TradingView, not from this desk&apos;s simulated news tape. Needs
-        network access.
+        network access.{" "}
+        <a
+          href={`https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tv)}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary hover:underline"
+        >
+          Open {tv} on TradingView
+        </a>
       </p>
     </div>
   );
