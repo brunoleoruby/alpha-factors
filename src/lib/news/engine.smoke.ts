@@ -3,6 +3,7 @@ import { findSwings } from "../markets/swings";
 import type { Candle } from "../markets/tv";
 import { classifyHeadline } from "./classify";
 import { INSIDER_LABELED } from "./cases/insider-trading";
+import { TAPE_LABELED } from "./cases/tape-events";
 import { createNewsState } from "./engine";
 import { DEFAULT_STRATEGY, DEFAULT_STRATEGY_NSE } from "./taxonomy";
 
@@ -35,6 +36,35 @@ if (sebiReview.eventType !== "regulation") {
 
 if (!INSIDER_LABELED.length || INSIDER_LABELED.some((p) => p.eventType !== "insider_trading")) {
   throw new Error("expected Infosys PIT prints to classify as insider_trading");
+}
+
+const want: Record<string, string> = {
+  "ADANIENT|2023-01-24": "legal",
+  "ADANIENT|2023-01-27": "promoter_pledge",
+  "ADANIENT|2023-02-01": "offering",
+  "HDFCBANK|2020-07-31": "qip_block",
+  "ZOMATO|2023-08-08": "qip_block",
+  "AUROPHARMA|2023-01-18": "usfda",
+  "LUPIN|2017-06-12": "usfda",
+  "YESBANK|2018-09-21": "rating_cut",
+  "YESBANK|2019-02-14": "rating_cut",
+  "TCS|2023-10-12": "analyst_upgrade",
+};
+for (const row of TAPE_LABELED) {
+  const expected = want[`${row.symbol}|${row.date}`];
+  if (expected && row.eventType !== expected) {
+    throw new Error(`${row.symbol} ${row.date}: expected ${expected}, got ${row.eventType}`);
+  }
+}
+
+const fdaOk = classifyHeadline("Pfizer gets FDA approval for a new product program");
+if (fdaOk.eventType !== "product") {
+  throw new Error(`expected product for FDA approval, got ${fdaOk.eventType}`);
+}
+
+const street = classifyHeadline("Broker downgrades RELIANCE to underweight, price target cut");
+if (street.eventType !== "analyst_downgrade") {
+  throw new Error(`expected analyst_downgrade, got ${street.eventType}`);
 }
 
 const state = createNewsState(DEFAULT_STRATEGY);

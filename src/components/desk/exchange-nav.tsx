@@ -82,6 +82,11 @@ export function NseSubnav() {
         { href: "/nse/cases/polycab", label: "Polycab case", active: (p) => p.startsWith("/nse/cases/polycab") },
         { href: "/nse/cases/insider", label: "Insider trading", active: (p) => p.startsWith("/nse/cases/insider") },
         {
+          href: "/nse/cases/tape-events",
+          label: "Pledge · QIP · USFDA",
+          active: (p) => p.startsWith("/nse/cases/tape-events"),
+        },
+        {
           href: "/nse/environment",
           label: "Market environment",
           active: (p) => p.startsWith("/nse/environment"),

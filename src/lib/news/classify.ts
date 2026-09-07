@@ -41,6 +41,10 @@ const NEG = [
   "plunges",
   "insider",
   "upsi",
+  "pledge",
+  "qip",
+  "483",
+  "junk",
 ];
 
 export type Classification = {
@@ -86,7 +90,7 @@ export function classifyHeadline(headline: string): Classification {
     if (POS.includes(t)) sent += 1;
     if (NEG.includes(t)) sent -= 1;
   }
-  if (eventType.includes("miss") || eventType.includes("cut") || eventType === "legal" || eventType === "outage" || eventType === "offering" || eventType === "analyst_downgrade" || eventType === "insider_trading") {
+  if (eventType.includes("miss") || eventType.includes("cut") || eventType === "legal" || eventType === "outage" || eventType === "offering" || eventType === "analyst_downgrade" || eventType === "insider_trading" || eventType === "promoter_pledge" || eventType === "qip_block" || eventType === "usfda") {
     sent -= 0.6;
   }
   if (eventType.includes("beat") || eventType.includes("raise") || eventType === "buyback" || eventType === "mna" || eventType === "analyst_upgrade") {
@@ -94,6 +98,7 @@ export function classifyHeadline(headline: string): Classification {
   }
   if (/\blayoffs?\b|\bjob cuts\b/.test(norm)) sent += 0.2;
   if (/\bhiring freeze\b/.test(norm)) sent -= 0.4;
+  if (/\bform 483\b/.test(norm) && /procedural/.test(norm)) sent += 0.35;
 
   const intensity =
     Math.min(

@@ -20,7 +20,7 @@ export type NeuralFit = {
 
 const ALT_SOURCES = /moneycontrol|economic times|business standard|mint|nse|you/i;
 const WIRE_SOURCES = /reuters|bloomberg|wsj|cnbc|ft/i;
-const ALT_KW = /sebi|rbi|gst|fii|repo rate|qip|usfda|cpi|inflation|upsi|pit |insider/;
+const ALT_KW = /sebi|rbi|gst|fii|repo rate|qip|usfda|cpi|inflation|upsi|pit |insider|pledge|483|crisil|icra|moody/;
 
 export function altFeatureVector(item: NewsItem, cascade: number, echo: number): number[] {
   const cls = item.classification;

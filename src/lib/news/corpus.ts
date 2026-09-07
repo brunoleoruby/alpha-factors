@@ -93,6 +93,26 @@ const TEMPLATES: Record<EventType, string[]> = {
     "{symbol} connected persons face insider-trading allegations under PIT regulations",
     "SEC charges connected persons with insider trading ahead of {name} {thing} print",
   ],
+  promoter_pledge: [
+    "Promoters of {name} raise share pledge against {thing} loans",
+    "{symbol} promoter pledged shares rise; encumbrance on {thing}",
+    "Pledge invocation risk at {name} after {thing} slide",
+  ],
+  qip_block: [
+    "{name} announces QIP of shares to fund {thing}",
+    "Block deal in {symbol} as institutions place {thing} stock",
+    "{name} prices qualified institutional placement",
+  ],
+  usfda: [
+    "USFDA issues Form 483 with observations at {name} {thing} plant",
+    "{symbol} gets US FDA warning letter on {thing} facility",
+    "Import alert risk after USFDA inspection of {name} {thing} site",
+  ],
+  rating_cut: [
+    "CRISIL downgrades {name} credit rating citing {thing}",
+    "Moody's downgrades {symbol}; cuts rating on {thing} stress",
+    "ICRA downgrades {name} after {thing} deterioration",
+  ],
   macro: [
     "Inflation data, CPI print reshapes rate-cut bets; {symbol} in focus",
     "Federal Reserve signals path for rates; {thing} names react including {name}",
@@ -198,6 +218,34 @@ export function generateCorpus(options: CorpusOptions = {}): NewsItem[] {
           templates = [
             "SEBI PIT notice on {name} promoters over alleged insider trading in {thing}",
             "Insider-trading issue: unpublished price-sensitive information leak tied to {symbol}",
+            ...templates,
+          ];
+        }
+        if (rule.id === "promoter_pledge") {
+          templates = [
+            "{name} promoters increase pledged shares / encumbrance after {thing} weakness",
+            "Collateral top-up: pledged shares in {symbol} raised to cover loans",
+            ...templates,
+          ];
+        }
+        if (rule.id === "qip_block") {
+          templates = [
+            "{name} board okays QIP to fund {thing}",
+            "Bulk deal: institutions sell {symbol} in a block print",
+            ...templates,
+          ];
+        }
+        if (rule.id === "usfda") {
+          templates = [
+            "USFDA Form 483 at {name} {thing} facility; company says observations are procedural",
+            "{symbol} plant under US FDA inspection; Form 483 issued",
+            ...templates,
+          ];
+        }
+        if (rule.id === "rating_cut") {
+          templates = [
+            "CRISIL cuts {name} credit rating on {thing} cash-flow stress",
+            "ICRA downgrades {symbol} after {thing} miss",
             ...templates,
           ];
         }

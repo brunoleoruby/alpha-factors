@@ -57,7 +57,7 @@ Settings (confidence bars, hold period, cascade/echo) are remembered in this use
 
 ## What the algorithm does
 
-1. **Classify** — map a headline to an event (earnings, guidance, M&A, legal, insider trading / PIT, outage, …).
+1. **Classify** — map a headline to an event (earnings, guidance, M&A, legal, insider trading / PIT, promoter pledge, QIP/block, USFDA, credit-rating cut, outage, …).
 2. **Rhyme** — TF-IDF cosine vs earlier headlines of the same type.
 3. **Behavior** — typical 1-day / 5-day path, hit rate, fade rate.
 4. **Neural** — a small MLP trained on earlier labeled prints maps non-linear sentiment and alternative-data flags (wire vs local source, SEBI/RBI/FII language, intensity) into its own 1d/5d move; the desk blends that with the neighbor path.
@@ -85,5 +85,6 @@ Then open http://127.0.0.1:43123 — same engine, in a tab.
 - **Market environment** — `/nse/environment` (NSE) and `/environment` (US) — Varun’s personal regime tab. Empty on purpose; we fill it from how he reads the tape.
 - **Polycab case** — `/nse/cases/polycab` — IT search / CBDT window, classified and rhymed.
 - **Insider trading** — `/nse/cases/insider` — PIT / UPSI event type, worked through Infosys June 2021 (SEBI interim order, mild large-cap close, SAT then dismissal).
+- **Pledge · QIP · USFDA · Rating** — `/nse/cases/tape-events` — promoter pledge, QIP/block, USFDA 483, credit-rating cut. Market environment stays empty.
 
 Charts use TradingView Lightweight Charts for every name. Switch 15m / 1H / 1D / 1W / 1M and use **Swings** to mark fractal highs and lows as dots on that timeframe. NSE cash names cannot use TradingView’s public embed; Open on TradingView still goes to the full site.
