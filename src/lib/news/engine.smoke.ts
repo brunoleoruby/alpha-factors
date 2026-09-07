@@ -1,4 +1,5 @@
 import { NSE_LISTINGS } from "../markets/nse";
+import { ENV_COLUMNS, ENV_YAHOO_SYMBOLS } from "../markets/environment";
 import { findSwings } from "../markets/swings";
 import type { Candle } from "../markets/tv";
 import { classifyHeadline } from "./classify";
@@ -94,6 +95,12 @@ if (state.neural.samples < 20) throw new Error("neural net underfit");
 
 const next = state.asOfIndex;
 if (next < 0) throw new Error("bad asOf");
+
+if (ENV_COLUMNS.length !== 6) throw new Error("expected six environment columns");
+if (new Set(ENV_COLUMNS.map((c) => c.id)).size !== 6) throw new Error("environment columns must be unique");
+if (new Set(ENV_YAHOO_SYMBOLS).size !== ENV_YAHOO_SYMBOLS.length) {
+  throw new Error("environment Yahoo symbols must be unique");
+}
 
 console.log(
   JSON.stringify(

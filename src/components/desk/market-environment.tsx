@@ -1,50 +1,126 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+"use client";
 
-const SLOTS = [
-  {
-    title: "How you read the tape",
-    body: "Your regime rules — not a textbook VIX recipe. We’ll encode when you feel risk-on, when you sit out, and what you ignore.",
-  },
-  {
-    title: "What you actually watch",
-    body: "The few tells that matter to you (FII, India VIX, dollar, credit, sector leadership). Empty until you name them.",
-  },
-  {
-    title: "How you size the day",
-    body: "Your personality on size: aggressive only when the tape agrees with you, flat when it doesn’t. Logic comes later.",
-  },
-];
+import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatPct, formatSigned, pnlClass } from "@/lib/format";
+import { ENV_COLUMNS, type EnvInstrument, type EnvQuote } from "@/lib/markets/environment";
+import { cn } from "cn";
+
+type Feed = {
+  asOf: string;
+  live: number;
+  total: number;
+  quotes: EnvQuote[];
+};
+
+function formatLevel(n: number, digits: number) {
+  return n.toLocaleString("en-IN", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+function Row({ instrument, quote, loading }: { instrument: EnvInstrument; quote?: EnvQuote; loading: boolean }) {
+  const last = quote?.last;
+  const pct = quote?.changePct;
+  const chg = quote?.change;
+  return (
+    <div className="border-border/50 flex items-baseline justify-between gap-2 border-b py-2 last:border-b-0">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium">{instrument.name}</p>
+        <p className="text-muted-foreground font-mono text-[10px] tracking-wide">{instrument.short}</p>
+      </div>
+      <div className="text-right">
+        {loading && last == null ? (
+          <p className="text-muted-foreground text-sm">…</p>
+        ) : last == null ? (
+          <p className="text-muted-foreground text-xs">{quote?.error ?? "—"}</p>
+        ) : (
+          <>
+            <p className="font-mono text-sm font-semibold">{formatLevel(last, instrument.digits)}</p>
+            <p className={cn("font-mono text-[11px]", pct != null ? pnlClass(pct) : "text-muted-foreground")}>
+              {pct != null ? formatPct(pct) : "—"}
+              {chg != null ? <span className="text-muted-foreground"> {formatSigned(chg)}</span> : null}
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function MarketEnvironment() {
+  const [feed, setFeed] = useState<Feed | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let dead = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/environment", { cache: "no-store" });
+        const body = (await res.json()) as Feed & { error?: string };
+        if (!res.ok) throw new Error(body.error ?? `Feed ${res.status}`);
+        if (dead) return;
+        setFeed(body);
+        setError(null);
+      } catch (err) {
+        if (!dead) setError(err instanceof Error ? err.message : "Quote feed down");
+      } finally {
+        if (!dead) setLoading(false);
+      }
+    };
+    void load();
+    const t = setInterval(() => void load(), 60_000);
+    return () => {
+      dead = true;
+      clearInterval(t);
+    };
+  }, []);
+
+  const byId = useMemo(() => {
+    const m = new Map<string, EnvQuote>();
+    for (const q of feed?.quotes ?? []) m.set(q.id, q);
+    return m;
+  }, [feed]);
+
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-5 px-4 pb-10 md:px-6">
+    <div className="mx-auto flex w-full max-w-[1800px] flex-1 flex-col gap-5 px-4 pb-10 md:px-6">
       <header className="mt-2">
-        <p className="text-primary text-xs font-medium tracking-[0.22em] uppercase">
-          Varun G V · personal
+        <p className="text-primary text-xs font-medium tracking-[0.22em] uppercase">Varun G V · personal</p>
+        <h1 className="font-heading mt-1 text-3xl font-semibold tracking-tight md:text-4xl">Market environment</h1>
+        <p className="text-muted-foreground mt-2 max-w-3xl text-sm leading-relaxed">
+          Six columns, nothing mixed: Indian indices, USA indices, Asia indices, commodity, currency, and
+          crude oil. Delayed Yahoo prints. Not a broker board.
         </p>
-        <h1 className="font-heading mt-1 text-3xl font-semibold tracking-tight md:text-4xl">
-          Market environment
-        </h1>
-        <p className="text-muted-foreground mt-2 max-w-2xl text-sm leading-relaxed">
-          This tab is only your lens. No shared factor model, no default India-macro dashboard. We
-          build it from how you see the market — later.
-        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          {loading ? <Badge variant="outline">Loading tape</Badge> : null}
+          {feed ? (
+            <Badge variant="outline">
+              {feed.live}/{feed.total} live
+            </Badge>
+          ) : null}
+          {error ? <Badge variant="destructive">{error}</Badge> : null}
+        </div>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {SLOTS.map((slot) => (
-          <Card key={slot.title} className="border-primary/15 bg-card/90">
-            <CardHeader>
-              <CardTitle className="text-base">{slot.title}</CardTitle>
-              <CardDescription>{slot.body}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground border-border/70 rounded-lg border border-dashed px-3 py-8 text-center text-sm">
-                Not built yet
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+        <div className="grid min-w-[72rem] grid-cols-6 gap-3">
+          {ENV_COLUMNS.map((col) => (
+            <Card key={col.id} className="border-primary/15 bg-card/90 min-w-0">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base leading-tight">{col.title}</CardTitle>
+                <CardDescription className="text-xs">{col.blurb}</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {col.rows.map((row) => (
+                  <Row key={row.id} instrument={row} quote={byId.get(row.id)} loading={loading} />
+                ))}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   );

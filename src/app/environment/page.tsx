@@ -3,7 +3,8 @@ import { MarketEnvironment } from "@/components/desk/market-environment";
 
 export const metadata = {
   title: "Market environment · Varun",
-  description: "Personal market-environment tab. Built later from Varun’s own read of the tape.",
+  description:
+    "Indian, USA, and Asia indices, plus commodity, currency, and crude oil — each in its own column.",
 };
 
 export default function UsEnvironmentPage() {
