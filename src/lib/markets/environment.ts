@@ -19,13 +19,12 @@ export const ENV_COLUMNS: EnvColumn[] = [
   {
     id: "india",
     title: "Indian indices",
-    blurb: "NSE / BSE cash-market tape.",
+    blurb: "NSE cash-market tape.",
     rows: [
       { id: "nifty", yahoo: "^NSEI", name: "Nifty 50", short: "NIFTY", digits: 2 },
-      { id: "banknifty", yahoo: "^NSEBANK", name: "Bank Nifty", short: "BANKNIFTY", digits: 2 },
-      { id: "sensex", yahoo: "^BSESN", name: "Sensex", short: "SENSEX", digits: 2 },
+      { id: "smallcap", yahoo: "NIFTY_SMLCAP_100.NS", name: "Nifty Smallcap 100", short: "SMLCAP", digits: 2 },
       { id: "midcap", yahoo: "NIFTY_MIDCAP_100.NS", name: "Nifty Midcap 100", short: "MIDCAP", digits: 2 },
-      { id: "niftyit", yahoo: "^CNXIT", name: "Nifty IT", short: "CNXIT", digits: 2 },
+      { id: "banknifty", yahoo: "^NSEBANK", name: "Bank Nifty", short: "BANKNIFTY", digits: 2 },
       { id: "indiavix", yahoo: "^INDIAVIX", name: "India VIX", short: "INDIA VIX", digits: 2 },
     ],
   },

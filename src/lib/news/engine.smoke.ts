@@ -101,6 +101,10 @@ if (new Set(ENV_COLUMNS.map((c) => c.id)).size !== 6) throw new Error("environme
 if (new Set(ENV_YAHOO_SYMBOLS).size !== ENV_YAHOO_SYMBOLS.length) {
   throw new Error("environment Yahoo symbols must be unique");
 }
+const indiaIds = ENV_COLUMNS.find((c) => c.id === "india")?.rows.map((r) => r.id) ?? [];
+if (indiaIds.join(",") !== "nifty,smallcap,midcap,banknifty,indiavix") {
+  throw new Error(`unexpected Indian indices: ${indiaIds.join(",")}`);
+}
 
 console.log(
   JSON.stringify(
