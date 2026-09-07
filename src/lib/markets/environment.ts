@@ -61,6 +61,8 @@ export const ENV_COLUMNS: EnvColumn[] = [
       { id: "gold", yahoo: "GC=F", name: "Gold", short: "GC", digits: 2 },
       { id: "silver", yahoo: "SI=F", name: "Silver", short: "SI", digits: 3 },
       { id: "copper", yahoo: "HG=F", name: "Copper", short: "HG", digits: 4 },
+      { id: "aluminium", yahoo: "ALI=F", name: "Aluminium", short: "ALI", digits: 2 },
+      { id: "zinc", yahoo: "ZNC=F", name: "Zinc", short: "ZNC", digits: 2 },
       { id: "natgas", yahoo: "NG=F", name: "Natural gas", short: "NG", digits: 3 },
     ],
   },
