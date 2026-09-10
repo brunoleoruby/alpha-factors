@@ -4,21 +4,51 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "cn";
 
+function isEnvironment(path: string) {
+  return path.startsWith("/environment") || path.startsWith("/nse/environment");
+}
+
+function isPortfolio(path: string) {
+  return path.startsWith("/portfolio");
+}
+
+function isTimeframe(path: string) {
+  return path.startsWith("/timeframe");
+}
+
+function isGlobalTab(path: string) {
+  return isEnvironment(path) || isPortfolio(path) || isTimeframe(path);
+}
+
 const links = [
-  { href: "/", label: "US", match: (path: string) => path === "/" || path.startsWith("/stocks") },
-  { href: "/nse", label: "NSE", match: (path: string) => path.startsWith("/nse") },
+  {
+    href: "/",
+    label: "US",
+    match: (path: string) => !path.startsWith("/nse") && !isGlobalTab(path),
+  },
+  {
+    href: "/nse",
+    label: "NSE",
+    match: (path: string) => path.startsWith("/nse") && !isGlobalTab(path),
+  },
 ];
 
 export function ExchangeNav() {
   const path = usePathname();
   const onNse = path.startsWith("/nse");
-  const allStocksHref = onNse ? "/nse/stocks" : "/stocks";
+  const allStocksHref = onNse && !isGlobalTab(path) ? "/nse/stocks" : "/stocks";
   const allStocksActive = onNse ? path.startsWith("/nse/stocks") : path.startsWith("/stocks");
+  const envActive = isEnvironment(path);
+  const portfolioActive = isPortfolio(path);
+  const timeframeActive = isTimeframe(path);
   return (
-    <div className="border-primary/20 bg-card/60 flex items-center gap-1 border-b px-4 py-2 md:px-6">
-      <span className="text-muted-foreground mr-3 hidden text-[10px] tracking-[0.18em] uppercase sm:inline">
-        Exchange
-      </span>
+    <div className="border-border sticky top-0 z-50 flex flex-wrap items-center gap-1 border-b bg-[#1e5a9a] px-4 py-3 md:px-8">
+      <Link href="/" className="mr-6 flex items-baseline gap-3">
+        <span className="font-heading text-lg tracking-wide">Alpha Factors 2.0</span>
+        <span className="text-muted-foreground hidden text-[10px] tracking-[0.22em] uppercase sm:inline">
+          Capital
+        </span>
+      </Link>
       {links.map((l) => {
         const active = l.match(path);
         return (
@@ -26,8 +56,8 @@ export function ExchangeNav() {
             key={l.href}
             href={l.href}
             className={cn(
-              "rounded-md px-3 py-1 text-sm font-medium",
-              active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+              "rounded-md px-3 py-1 text-sm",
+              active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent",
             )}
           >
             {l.label}
@@ -38,10 +68,37 @@ export function ExchangeNav() {
         href={allStocksHref}
         className={cn(
           "ml-2 rounded-md px-3 py-1 text-sm",
-          allStocksActive ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted",
+          allStocksActive ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent",
         )}
       >
         All stocks
+      </Link>
+      <Link
+        href="/environment"
+        className={cn(
+          "rounded-md px-3 py-1 text-sm",
+          envActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent",
+        )}
+      >
+        Market environment
+      </Link>
+      <Link
+        href="/portfolio"
+        className={cn(
+          "rounded-md px-3 py-1 text-sm",
+          portfolioActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent",
+        )}
+      >
+        Portfolio
+      </Link>
+      <Link
+        href="/timeframe"
+        className={cn(
+          "rounded-md px-3 py-1 text-sm",
+          timeframeActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent",
+        )}
+      >
+        Time frame
       </Link>
     </div>
   );
@@ -54,7 +111,7 @@ function PillNav({
 }) {
   const path = usePathname();
   return (
-    <div className="flex gap-2 px-4 pt-4 md:px-6">
+    <div className="flex gap-2 px-4 pt-5 md:px-8">
       {items.map((item) => (
         <Link
           key={item.href}
@@ -86,11 +143,6 @@ export function NseSubnav() {
           label: "Pledge · QIP · USFDA",
           active: (p) => p.startsWith("/nse/cases/tape-events"),
         },
-        {
-          href: "/nse/environment",
-          label: "Market environment",
-          active: (p) => p.startsWith("/nse/environment"),
-        },
       ]}
     />
   );
@@ -100,9 +152,9 @@ export function UsSubnav() {
   return (
     <PillNav
       items={[
-        { href: "/", label: "Pattern desk", active: (p) => p === "/" },
+        { href: "/", label: "Dashboard", active: (p) => p === "/" },
+        { href: "/desk", label: "Pattern desk", active: (p) => p.startsWith("/desk") },
         { href: "/stocks", label: "All stocks", active: (p) => p.startsWith("/stocks") },
-        { href: "/environment", label: "Market environment", active: (p) => p.startsWith("/environment") },
       ]}
     />
   );

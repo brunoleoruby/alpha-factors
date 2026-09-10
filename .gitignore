@@ -30,8 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# local trade book (do not commit fills)
+/data/trades.json
+/data/trades.json.tmp
+/data/timeframe-notes.json
+/data/timeframe-notes.json.tmp
 
 # vercel
 .vercel

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { IndexBehaviorPopup, type BehaviorPayload } from "@/components/desk/index-behavior-popup";
 import { formatPct, formatSigned, pnlClass } from "@/lib/format";
 import { ENV_COLUMNS, type EnvInstrument, type EnvQuote } from "@/lib/markets/environment";
 import { cn } from "cn";
@@ -21,14 +22,30 @@ function formatLevel(n: number, digits: number) {
   });
 }
 
-function Row({ instrument, quote, loading }: { instrument: EnvInstrument; quote?: EnvQuote; loading: boolean }) {
+function Row({
+  instrument,
+  quote,
+  loading,
+  onOpen,
+}: {
+  instrument: EnvInstrument;
+  quote?: EnvQuote;
+  loading: boolean;
+  onOpen: () => void;
+}) {
   const last = quote?.last;
   const pct = quote?.changePct;
   const chg = quote?.change;
   return (
-    <div className="border-border/50 flex items-baseline justify-between gap-2 border-b py-2 last:border-b-0">
+    <button
+      type="button"
+      onClick={onOpen}
+      className="border-border/50 hover:bg-white/8 flex w-full items-baseline justify-between gap-2 border-b py-2 text-left last:border-b-0"
+    >
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium">{instrument.name}</p>
+        <p className="truncate text-sm font-medium underline decoration-white/25 underline-offset-4">
+          {instrument.name}
+        </p>
         <p className="text-muted-foreground font-mono text-[10px] tracking-wide">{instrument.short}</p>
       </div>
       <div className="text-right">
@@ -46,7 +63,7 @@ function Row({ instrument, quote, loading }: { instrument: EnvInstrument; quote?
           </>
         )}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -54,6 +71,10 @@ export function MarketEnvironment() {
   const [feed, setFeed] = useState<Feed | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState<EnvInstrument | null>(null);
+  const [payload, setPayload] = useState<BehaviorPayload | null>(null);
+  const [popupLoading, setPopupLoading] = useState(false);
+  const [popupError, setPopupError] = useState<string | null>(null);
 
   useEffect(() => {
     let dead = false;
@@ -79,6 +100,33 @@ export function MarketEnvironment() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!open) {
+      setPayload(null);
+      setPopupError(null);
+      return;
+    }
+    let dead = false;
+    setPopupLoading(true);
+    setPopupError(null);
+    setPayload(null);
+    void fetch(`/api/environment/behavior?id=${encodeURIComponent(open.id)}`, { cache: "no-store" })
+      .then(async (res) => {
+        const body = (await res.json()) as BehaviorPayload & { error?: string };
+        if (!res.ok) throw new Error(body.error ?? `Behavior ${res.status}`);
+        if (!dead) setPayload(body);
+      })
+      .catch((err) => {
+        if (!dead) setPopupError(err instanceof Error ? err.message : "Behavior feed down");
+      })
+      .finally(() => {
+        if (!dead) setPopupLoading(false);
+      });
+    return () => {
+      dead = true;
+    };
+  }, [open]);
+
   const byId = useMemo(() => {
     const m = new Map<string, EnvQuote>();
     for (const q of feed?.quotes ?? []) m.set(q.id, q);
@@ -92,7 +140,8 @@ export function MarketEnvironment() {
         <h1 className="font-heading mt-1 text-3xl font-semibold tracking-tight md:text-4xl">Market environment</h1>
         <p className="text-muted-foreground mt-2 max-w-3xl text-sm leading-relaxed">
           Six columns, nothing mixed: Indian indices, USA indices, Asia indices, commodity, currency, and
-          crude oil. Delayed Yahoo prints. Not a broker board.
+          crude oil. Click a ticker for the tape-rhyme popup — same method as the news desk. Delayed Yahoo
+          prints.
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
           {loading ? <Badge variant="outline">Loading tape</Badge> : null}
@@ -115,13 +164,30 @@ export function MarketEnvironment() {
               </CardHeader>
               <CardContent className="pt-0">
                 {col.rows.map((row) => (
-                  <Row key={row.id} instrument={row} quote={byId.get(row.id)} loading={loading} />
+                  <Row
+                    key={row.id}
+                    instrument={row}
+                    quote={byId.get(row.id)}
+                    loading={loading}
+                    onOpen={() => setOpen(row)}
+                  />
                 ))}
               </CardContent>
             </Card>
           ))}
         </div>
       </div>
+
+      {open ? (
+        <IndexBehaviorPopup
+          instrument={open}
+          quote={byId.get(open.id)}
+          payload={payload}
+          loading={popupLoading}
+          error={popupError}
+          onClose={() => setOpen(null)}
+        />
+      ) : null}
     </div>
   );
 }

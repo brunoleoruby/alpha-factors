@@ -1,4 +1,3 @@
-import { UsSubnav } from "@/components/desk/exchange-nav";
 import { MarketEnvironment } from "@/components/desk/market-environment";
 
 export const metadata = {
@@ -8,10 +7,5 @@ export const metadata = {
 };
 
 export default function UsEnvironmentPage() {
-  return (
-    <>
-      <UsSubnav />
-      <MarketEnvironment />
-    </>
-  );
+  return <MarketEnvironment />;
 }

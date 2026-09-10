@@ -21,9 +21,8 @@ const cormorant = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "News Pattern Desk",
-  description:
-    "Classify stock headlines, match them to similar past prints, and trade the typical price path those news patterns produced.",
+  title: "Alpha Factors 2.0",
+  description: "Long/short equity partner dashboard.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -32,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`dark ${geistSans.variable} ${geistMono.variable} ${cormorant.variable} h-full antialiased`}
     >
-      <body className="bg-background text-foreground min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col">
         <TooltipProvider>
           <ExchangeNav />
           {children}

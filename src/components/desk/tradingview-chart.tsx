@@ -97,17 +97,17 @@ export function TradingViewChart({
       width: host.clientWidth || 640,
       height: host.clientHeight || 420,
       layout: {
-        background: { type: ColorType.Solid, color: "#0d0d0c" },
-        textColor: "#c4b89a",
+        background: { type: ColorType.Solid, color: "#ffffff" },
+        textColor: "#334155",
         fontFamily: "ui-monospace, monospace",
       },
       grid: {
-        vertLines: { color: "rgba(212, 191, 138, 0.08)" },
-        horzLines: { color: "rgba(212, 191, 138, 0.08)" },
+        vertLines: { color: "rgba(15, 23, 42, 0.08)" },
+        horzLines: { color: "rgba(15, 23, 42, 0.08)" },
       },
-      rightPriceScale: { borderColor: "rgba(212, 191, 138, 0.2)" },
+      rightPriceScale: { borderColor: "rgba(15, 23, 42, 0.18)" },
       timeScale: {
-        borderColor: "rgba(212, 191, 138, 0.2)",
+        borderColor: "rgba(15, 23, 42, 0.18)",
         timeVisible: false,
         secondsVisible: false,
       },
@@ -195,7 +195,7 @@ export function TradingViewChart({
   const lows = swings.filter((s) => s.kind === "low").length;
 
   return (
-    <div className={cn("overflow-hidden rounded-xl border border-primary/15 bg-[#0d0d0c]", className)}>
+    <div className={cn("overflow-hidden rounded-xl border border-primary/15 bg-white", className)}>
       <div className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-primary font-mono text-sm">
           {name ?? symbol} · {tv}
@@ -235,7 +235,7 @@ export function TradingViewChart({
       <div className={cn("relative w-full", heightClassName)}>
         <div ref={hostRef} className="absolute inset-0" />
         {error && !pending ? (
-          <div className="bg-background/80 absolute inset-0 flex items-center justify-center px-4 text-center text-sm">
+          <div className="absolute inset-0 flex items-center justify-center bg-white/90 px-4 text-center text-sm text-slate-600">
             <div>
               <p className="text-muted-foreground">{error}</p>
               <a

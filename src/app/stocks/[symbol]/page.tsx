@@ -27,7 +27,7 @@ export default async function UsStockChartPage({
   return (
     <>
       <UsSubnav />
-      <StockChartView listing={listing} locale="US" backHref="/stocks" deskHref="/" />
+      <StockChartView listing={listing} locale="US" backHref="/stocks" deskHref="/desk" />
     </>
   );
 }

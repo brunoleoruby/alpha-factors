@@ -15,14 +15,16 @@ function axisTick(tick: number) {
 export function EquityChart({
   points,
   money = formatUsd,
+  emptyLabel = "The news book will plot once the algorithm starts trading recognized patterns.",
 }: {
   points: NavPoint[];
   money?: (n: number) => string;
+  emptyLabel?: string;
 }) {
   if (points.length < 2) {
     return (
       <div className="text-muted-foreground flex h-64 items-center justify-center text-sm">
-        The news book will plot once the algorithm starts trading recognized patterns.
+        {emptyLabel}
       </div>
     );
   }
@@ -73,16 +75,17 @@ export function EquityChart({
           {formatPct(ret)} over {points.length} sessions
         </p>
       </div>
+      <div className="rounded-xl bg-white p-3">
       <svg
         viewBox={`0 0 ${w} ${h}`}
-        className="h-64 w-full md:h-72"
+        className="h-64 w-full bg-white md:h-72"
         role="img"
         aria-label="News-driven paper equity"
       >
         <defs>
           <linearGradient id="navFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#d4bf8a" stopOpacity="0.32" />
-            <stop offset="100%" stopColor="#d4bf8a" stopOpacity="0" />
+            <stop offset="0%" stopColor="#1e5a9a" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#1e5a9a" stopOpacity="0" />
           </linearGradient>
         </defs>
         {yTicks.map((tick) => {
@@ -94,15 +97,14 @@ export function EquityChart({
                 x2={padL + innerW}
                 y1={y}
                 y2={y}
-                stroke="currentColor"
-                className="text-border"
+                stroke="#e2e8f0"
                 strokeWidth="1"
               />
               <text
                 x={padL - 8}
                 y={y + 4}
                 textAnchor="end"
-                className="fill-muted-foreground"
+                fill="#64748b"
                 fontSize="11"
                 fontFamily="ui-monospace, monospace"
               >
@@ -112,14 +114,14 @@ export function EquityChart({
           );
         })}
         <path d={area} fill="url(#navFill)" />
-        <path d={line} fill="none" stroke="#d4bf8a" strokeWidth="2.25" />
+        <path d={line} fill="none" stroke="#1e5a9a" strokeWidth="2.25" />
         {xLabels.map(({ i, label }) => (
           <text
             key={label + i}
             x={xy(i, min)[0]}
             y={h - 8}
             textAnchor="middle"
-            className="fill-muted-foreground"
+            fill="#64748b"
             fontSize="11"
             fontFamily="ui-monospace, monospace"
           >
@@ -127,6 +129,7 @@ export function EquityChart({
           </text>
         ))}
       </svg>
+      </div>
     </div>
   );
 }
