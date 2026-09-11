@@ -30,3 +30,43 @@ export function findSwings(candles: Candle[], wing = 2): SwingPoint[] {
   }
   return points;
 }
+
+/** Three-candle swing: one lower high on each side of the pivot. */
+export function threePointSwingHighs(candles: Candle[]): SwingPoint[] {
+  return findSwings(candles, 1).filter((s) => s.kind === "high");
+}
+
+/** Three-candle swing: one higher low on each side of the pivot. */
+export function threePointSwingLows(candles: Candle[]): SwingPoint[] {
+  return findSwings(candles, 1).filter((s) => s.kind === "low");
+}
+
+export function lastThreePointSwingHighs(candles: Candle[], n = 3): SwingPoint[] {
+  return threePointSwingHighs(candles).slice(-n);
+}
+
+/** Alternate swing high → low → high so the structure can be drawn as a zigzag. */
+export function swingZigzag(candles: Candle[]): SwingPoint[] {
+  const merged = [...threePointSwingHighs(candles), ...threePointSwingLows(candles)].sort(
+    (a, b) => a.time - b.time || (a.kind === "low" ? -1 : 1),
+  );
+  const out: SwingPoint[] = [];
+  for (const point of merged) {
+    const last = out[out.length - 1];
+    if (!last) {
+      out.push(point);
+      continue;
+    }
+    if (last.time === point.time) {
+      if (last.kind !== point.kind) out.push(point);
+      continue;
+    }
+    if (last.kind === point.kind) {
+      if (point.kind === "high" && point.price >= last.price) out[out.length - 1] = point;
+      if (point.kind === "low" && point.price <= last.price) out[out.length - 1] = point;
+      continue;
+    }
+    out.push(point);
+  }
+  return out;
+}

@@ -48,10 +48,11 @@ export function StockChartView({
         {locale === "NSE" ? (
           <>
             NSE cash names are blocked on TradingView&apos;s public embed. Charts here use
-            TradingView Lightweight Charts with a Swings tool (dots on highs and lows) on every timeframe.{" "}
+            TradingView Lightweight Charts. Swing highs and lows are dotted and connected high-to-low
+            and low-to-high. Use Candles to hide or show the bars.{" "}
           </>
         ) : (
-          <>Live candles with swing high / low marks on each timeframe. </>
+          <>Live candles with swing high/low dots and a zigzag. Use Candles to hide or show bars. </>
         )}
         <a
           href={`https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tv)}`}

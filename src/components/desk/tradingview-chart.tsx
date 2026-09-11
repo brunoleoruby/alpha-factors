@@ -6,6 +6,7 @@ import {
   ColorType,
   createChart,
   createSeriesMarkers,
+  type BusinessDay,
   type IChartApi,
   type ISeriesApi,
   type ISeriesMarkersPluginApi,
@@ -15,7 +16,8 @@ import {
 import { cn } from "cn";
 import type { ExchangeId } from "@/lib/markets/types";
 import { TIMEFRAMES, tradingViewSymbol, type Candle, type TimeframeId } from "@/lib/markets/tv";
-import { findSwings } from "@/lib/markets/swings";
+import { swingZigzag, threePointSwingHighs, threePointSwingLows } from "@/lib/markets/swings";
+import { SwingZigzagPrimitive } from "@/components/desk/swing-zigzag-primitive";
 
 type Feed = {
   candles: Candle[];
@@ -25,6 +27,24 @@ type Feed = {
   error?: string;
 };
 
+const CANDLE_SHOWN = {
+  upColor: "#3d9a78",
+  downColor: "#a33a4a",
+  borderUpColor: "#3d9a78",
+  borderDownColor: "#a33a4a",
+  wickUpColor: "#3d9a78",
+  wickDownColor: "#a33a4a",
+};
+
+const CANDLE_HIDDEN = {
+  upColor: "rgba(0,0,0,0)",
+  downColor: "rgba(0,0,0,0)",
+  borderUpColor: "rgba(0,0,0,0)",
+  borderDownColor: "rgba(0,0,0,0)",
+  wickUpColor: "rgba(0,0,0,0)",
+  wickDownColor: "rgba(0,0,0,0)",
+};
+
 function formatLast(n: number, currency: string) {
   if (currency === "INR") {
     return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
@@ -32,9 +52,24 @@ function formatLast(n: number, currency: string) {
   return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 }
 
-function toBars(candles: Candle[]) {
+function isIntraday(tf: TimeframeId) {
+  return tf === "15m" || tf === "1h";
+}
+
+/** Daily / weekly / monthly bars use calendar days so swing dots stay on the candle. */
+function toChartTime(unix: number, tf: TimeframeId): Time {
+  if (isIntraday(tf)) return unix as UTCTimestamp;
+  const d = new Date(unix * 1000);
+  return {
+    year: d.getUTCFullYear(),
+    month: d.getUTCMonth() + 1,
+    day: d.getUTCDate(),
+  } satisfies BusinessDay;
+}
+
+function toBars(candles: Candle[], tf: TimeframeId) {
   return candles.map((c) => ({
-    time: c.time as UTCTimestamp,
+    time: toChartTime(c.time, tf),
     open: c.open,
     high: c.high,
     low: c.low,
@@ -42,26 +77,21 @@ function toBars(candles: Candle[]) {
   }));
 }
 
-function toMarkers(candles: Candle[]) {
-  return findSwings(candles, 2).map((s) =>
-    s.kind === "high"
-      ? {
-          time: s.time as UTCTimestamp,
-          position: "atPriceTop" as const,
-          price: s.price,
-          color: "#d4bf8a",
-          shape: "circle" as const,
-          size: 0.9,
-        }
-      : {
-          time: s.time as UTCTimestamp,
-          position: "atPriceBottom" as const,
-          price: s.price,
-          color: "#3d9a78",
-          shape: "circle" as const,
-          size: 0.9,
-        },
-  );
+function toMarkers(candles: Candle[], tf: TimeframeId) {
+  const size = tf === "1W" || tf === "1M" ? 1.15 : 0.9;
+  const points = [
+    ...threePointSwingHighs(candles).map((s) => ({ ...s, color: "#1e5a9a" })),
+    ...threePointSwingLows(candles).map((s) => ({ ...s, color: "#3d9a78" })),
+  ].sort((a, b) => a.time - b.time || (a.kind === "low" ? -1 : 1));
+  return points.map((s) => ({
+    time: toChartTime(s.time, tf),
+    position: "atPriceMiddle" as const,
+    price: s.price,
+    color: s.color,
+    shape: "circle" as const,
+    size,
+    id: `${s.kind}-${s.time}`,
+  }));
 }
 
 export function TradingViewChart({
@@ -82,8 +112,10 @@ export function TradingViewChart({
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  const zigzagRef = useRef<SwingZigzagPrimitive | null>(null);
   const [tf, setTf] = useState<TimeframeId>("1D");
   const [swingsOn, setSwingsOn] = useState(true);
+  const [candlesOn, setCandlesOn] = useState(true);
   const [feed, setFeed] = useState<Feed | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
@@ -114,17 +146,15 @@ export function TradingViewChart({
       crosshair: { mode: 0 },
     });
     const series = chart.addSeries(CandlestickSeries, {
-      upColor: "#3d9a78",
-      downColor: "#a33a4a",
-      borderUpColor: "#3d9a78",
-      borderDownColor: "#a33a4a",
-      wickUpColor: "#3d9a78",
-      wickDownColor: "#a33a4a",
+      ...CANDLE_SHOWN,
     });
     const markers = createSeriesMarkers(series, []);
+    const zigzag = new SwingZigzagPrimitive();
+    series.attachPrimitive(zigzag);
     chartRef.current = chart;
     seriesRef.current = series;
     markersRef.current = markers;
+    zigzagRef.current = zigzag;
 
     let lastW = 0;
     let lastH = 0;
@@ -147,6 +177,7 @@ export function TradingViewChart({
       chartRef.current = null;
       seriesRef.current = null;
       markersRef.current = null;
+      zigzagRef.current = null;
     };
   }, []);
 
@@ -177,22 +208,31 @@ export function TradingViewChart({
     const chart = chartRef.current;
     const markers = markersRef.current;
     if (!series || !chart || !feed?.candles.length) return;
-    series.setData(toBars(feed.candles));
-    markers?.setMarkers(swingsOn ? toMarkers(feed.candles) : []);
+    series.setData(toBars(feed.candles, tf));
     chart.applyOptions({
-      timeScale: { timeVisible: tf === "15m" || tf === "1h", secondsVisible: false },
+      timeScale: { timeVisible: isIntraday(tf), secondsVisible: false },
     });
     chart.timeScale().fitContent();
-  }, [feed, swingsOn, tf]);
+    markers?.setMarkers(swingsOn ? toMarkers(feed.candles, tf) : []);
+    zigzagRef.current?.setPoints(swingsOn ? swingZigzag(feed.candles) : [], (unix) =>
+      toChartTime(unix, tf),
+    );
+  }, [feed, tf, swingsOn]);
+
+  useEffect(() => {
+    seriesRef.current?.applyOptions(candlesOn ? CANDLE_SHOWN : CANDLE_HIDDEN);
+  }, [candlesOn, feed]);
 
   const pending = loadedFor !== requestKey;
   const hasChart = Boolean(feed?.candles.length) && !error;
-  const swings = useMemo(
-    () => (feed?.candles.length ? findSwings(feed.candles, 2) : []),
+  const highs = useMemo(
+    () => (feed?.candles.length ? threePointSwingHighs(feed.candles).length : 0),
     [feed],
   );
-  const highs = swings.filter((s) => s.kind === "high").length;
-  const lows = swings.filter((s) => s.kind === "low").length;
+  const lows = useMemo(
+    () => (feed?.candles.length ? threePointSwingLows(feed.candles).length : 0),
+    [feed],
+  );
 
   return (
     <div className={cn("overflow-hidden rounded-xl border border-primary/15 bg-white", className)}>
@@ -226,9 +266,20 @@ export function TradingViewChart({
               "ml-1 rounded-md px-2 py-1 text-[11px] tracking-wide uppercase",
               swingsOn ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted",
             )}
-            title="Mark swing highs and lows on this timeframe"
+            title="Connect swing high to low and low to high"
           >
             Swings{swingsOn && hasChart && !pending ? ` ${highs}/${lows}` : ""}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCandlesOn((v) => !v)}
+            className={cn(
+              "rounded-md px-2 py-1 text-[11px] tracking-wide uppercase",
+              candlesOn ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted",
+            )}
+            title={candlesOn ? "Hide candlesticks" : "Show candlesticks"}
+          >
+            Candles
           </button>
         </div>
       </div>
