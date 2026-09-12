@@ -11,6 +11,7 @@ import {
   type DowPrimary,
   type DowStance,
 } from "@/lib/markets/dow-theory";
+import { SectorLiveBook } from "@/components/desk/sector-live-book";
 import {
   SECTOR_AS_OF,
   SECTOR_START,
@@ -124,8 +125,8 @@ export function SectorAnalysis() {
               Who paid from 2021
             </h1>
             <p className="text-muted-foreground mt-3 max-w-xl text-sm leading-relaxed">
-              Total return from {SECTOR_START} to {SECTOR_AS_OF}. 2026 is year-to-date. Desk
-              reference vs sector indices — not a live feed.
+              Live book uses 6-month skip-month momentum, a 12-month index gate, and a VIX
+              overlay. History below is total return from {SECTOR_START} to {SECTOR_AS_OF}.
             </p>
           </div>
           <div className="flex gap-2">
@@ -147,6 +148,8 @@ export function SectorAnalysis() {
           </div>
         </div>
       </header>
+
+      <SectorLiveBook market={market} />
 
       <section className="border-border grid gap-6 border-y py-8 md:grid-cols-3">
         <div>
