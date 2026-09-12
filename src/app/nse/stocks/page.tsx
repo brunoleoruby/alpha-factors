@@ -1,6 +1,6 @@
 import { AllStocksTable } from "@/components/desk/all-stocks-table";
 import { NseSubnav } from "@/components/desk/exchange-nav";
-import { NSE_LISTINGS } from "@/lib/markets/nse";
+import { NIFTY50_LISTINGS } from "@/lib/markets/nse";
 
 export default function NseStocksPage() {
   return (
@@ -9,14 +9,14 @@ export default function NseStocksPage() {
       <header className="mx-auto mt-2 w-full max-w-[1600px]">
         <p className="text-primary text-xs font-medium tracking-[0.22em] uppercase">NSE · cash equity</p>
         <h1 className="font-heading mt-1 text-3xl font-semibold tracking-tight md:text-4xl">
-          All stocks
+          Nifty 50
         </h1>
         <p className="text-muted-foreground mt-1 max-w-2xl text-sm leading-relaxed">
-          Every name on this NSE desk. Open a symbol for its TradingView chart, or search the book
-          then switch to Pattern desk to paste a headline.
+          The 50 Nifty cash names on this desk. Open a symbol for its TradingView chart, or search
+          the book then switch to Pattern desk to paste a headline.
         </p>
       </header>
-      <AllStocksTable listings={NSE_LISTINGS} locale="NSE" />
+      <AllStocksTable listings={NIFTY50_LISTINGS} locale="NSE" title="Nifty 50" />
     </div>
   );
 }

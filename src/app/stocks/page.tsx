@@ -9,13 +9,13 @@ export default function UsStocksPage() {
       <header className="mx-auto mt-2 w-full max-w-[1600px]">
         <p className="text-primary text-xs font-medium tracking-[0.22em] uppercase">US · listed names</p>
         <h1 className="font-heading mt-1 text-3xl font-semibold tracking-tight md:text-4xl">
-          All stocks
+          Top 50
         </h1>
         <p className="text-muted-foreground mt-1 max-w-2xl text-sm leading-relaxed">
-          Every US name on this desk. Open a row for the TradingView chart.
+          The 50 largest US names on this desk by market cap. Open a row for the TradingView chart.
         </p>
       </header>
-      <AllStocksTable listings={US_LISTINGS} locale="US" />
+      <AllStocksTable listings={US_LISTINGS} locale="US" title="US top 50" />
     </div>
   );
 }

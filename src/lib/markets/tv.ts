@@ -1,6 +1,43 @@
 import type { ExchangeId, Listing } from "./types";
 
-const NYSE = new Set(["JPM", "XOM", "UNH", "PFE", "BA", "DIS"]);
+const NYSE = new Set([
+  "ABBV",
+  "ABT",
+  "AXP",
+  "BAC",
+  "BA",
+  "BRK.B",
+  "CAT",
+  "CVX",
+  "DIS",
+  "GE",
+  "GS",
+  "HD",
+  "IBM",
+  "JNJ",
+  "JPM",
+  "KO",
+  "LIN",
+  "LLY",
+  "MA",
+  "MCD",
+  "ORCL",
+  "PEP",
+  "PFE",
+  "PG",
+  "PM",
+  "RTX",
+  "TMO",
+  "UNH",
+  "V",
+  "WFC",
+  "WMT",
+  "XOM",
+]);
+
+const YAHOO_ALIAS: Record<string, string> = {
+  "BRK.B": "BRK-B",
+};
 
 export function tradingViewSymbol(symbol: string, locale: ExchangeId) {
   if (locale === "NSE") return `NSE:${symbol}`;
@@ -41,7 +78,7 @@ export type Candle = {
 
 export function yahooSymbol(symbol: string, locale: ExchangeId) {
   if (locale === "NSE") return `${symbol}.NS`;
-  return symbol;
+  return YAHOO_ALIAS[symbol] ?? symbol;
 }
 
 export function findListing(listings: Listing[], raw: string) {

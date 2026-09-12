@@ -1,17 +1,21 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useHeaderSave } from "@/components/desk/header-save";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatDate } from "@/lib/format";
 import {
-  TIME_FRAMES,
+  VERDICTS,
   emptyNoteForm,
   loadNotes,
   nextSerial,
   parseNoteList,
   saveNotes,
+  trialTally,
   type TimeFrameNote,
+  type TrialVerdict,
 } from "@/lib/journal/notes";
 
 const fieldClass =
@@ -23,6 +27,8 @@ export function TimeframeJournal() {
   const [form, setForm] = useState(emptyNoteForm(1));
   const [error, setError] = useState<string | null>(null);
   const [persist, setPersist] = useState<"disk" | "browser" | "error">("browser");
+  const [dirty, setDirty] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
 
   useEffect(() => {
     let dead = false;
@@ -61,34 +67,34 @@ export function TimeframeJournal() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!ready) return;
+  const persistJournal = useCallback(async () => {
+    setSaveBusy(true);
+    setError(null);
     saveNotes(notes);
-    const t = window.setTimeout(() => {
-      void fetch("/api/timeframe/notes", {
+    try {
+      const res = await fetch("/api/timeframe/notes", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notes }),
-      })
-        .then((res) => {
-          if (res.ok) setPersist("disk");
-          else setPersist("error");
-        })
-        .catch(() => setPersist("error"));
-    }, 200);
-    return () => window.clearTimeout(t);
-  }, [ready, notes]);
+      });
+      if (!res.ok) throw new Error("Save failed");
+      setPersist("disk");
+      setDirty(false);
+    } catch {
+      setPersist("error");
+      setError("Could not save the journal. Try Save again.");
+    } finally {
+      setSaveBusy(false);
+    }
+  }, [notes]);
+
+  useHeaderSave({ dirty, busy: saveBusy, onSave: persistJournal });
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     const thoughts = form.thoughts.trim();
-    const timeframe = form.timeframe.trim();
     if (!form.date || !form.time) {
       setError("Enter date and time.");
-      return;
-    }
-    if (!timeframe) {
-      setError("Enter a time frame.");
       return;
     }
     if (!thoughts) {
@@ -101,22 +107,32 @@ export function TimeframeJournal() {
       serial,
       date: form.date,
       time: form.time,
-      timeframe,
+      timeframe: form.timeframe.trim(),
       thoughts,
+      verdict: form.verdict,
+      tStat: form.tStat,
     };
     const next = [note, ...notes].sort((a, b) => b.serial - a.serial);
     setNotes(next);
     setForm(emptyNoteForm(nextSerial(next)));
     setError(null);
+    setDirty(true);
   }
 
   function removeNote(id: string) {
     const next = notes.filter((n) => n.id !== id);
     setNotes(next);
     setForm((f) => ({ ...f, serial: nextSerial(next) }));
+    setDirty(true);
+  }
+
+  function setVerdict(id: string, verdict: TrialVerdict) {
+    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, verdict } : n)));
+    setDirty(true);
   }
 
   const ordered = [...notes].sort((a, b) => b.serial - a.serial);
+  const tally = trialTally(notes);
 
   return (
     <div className="mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-10 px-4 py-10 md:px-8 md:py-14">
@@ -126,15 +142,41 @@ export function TimeframeJournal() {
           Time frame
         </h1>
         <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-relaxed">
-          Log thoughts against a serial number, date, clock time, and chart time frame. Saved to{" "}
+          Log thoughts against a serial number, date, and clock time. Every row is a trial — killed or
+          survived — so the denominator is never missing. Click Save in the top bar after you add or
+          edit notes. Saved to{" "}
           <span className="font-mono text-foreground/80">data/timeframe-notes.json</span>.
           {persist === "disk"
             ? " Saved on disk."
             : persist === "error"
               ? " Disk save failed — still in this browser."
               : " Using this browser until disk is ready."}
+          {dirty ? " Unsaved changes." : ""}
         </p>
       </header>
+
+      <section className="border-border grid grid-cols-2 gap-x-6 gap-y-6 border-y py-6 md:grid-cols-4">
+        <div>
+          <p className="text-muted-foreground text-[10px] tracking-[0.22em] uppercase">Trials</p>
+          <p className="mt-2 font-mono text-2xl tabular-nums">{tally.n}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-[10px] tracking-[0.22em] uppercase">Open</p>
+          <p className="mt-2 font-mono text-2xl tabular-nums">{tally.open}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-[10px] tracking-[0.22em] uppercase">Killed</p>
+          <p className="mt-2 font-mono text-2xl tabular-nums">{tally.killed}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-[10px] tracking-[0.22em] uppercase">Survived</p>
+          <p className="mt-2 font-mono text-2xl tabular-nums">{tally.survived}</p>
+        </div>
+      </section>
+      <p className="text-muted-foreground -mt-6 text-xs">
+        A survivor from trial 4 and trial {Math.max(tally.n, 400)} are not the same finding. t &gt; 3.0
+        is the bar if you log a t-stat.
+      </p>
 
       <section>
         <h2 className="text-muted-foreground mb-5 text-[11px] font-medium tracking-[0.24em] uppercase">
@@ -184,41 +226,6 @@ export function TimeframeJournal() {
               required
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="note-tf" className="text-slate-600">
-              Time frame
-            </Label>
-            <select
-              id="note-tf"
-              className={fieldClass}
-              value={TIME_FRAMES.includes(form.timeframe as (typeof TIME_FRAMES)[number]) ? form.timeframe : "custom"}
-              onChange={(e) => {
-                const v = e.target.value;
-                setForm((f) => ({ ...f, timeframe: v === "custom" ? "" : v }));
-              }}
-            >
-              {TIME_FRAMES.map((tf) => (
-                <option key={tf} value={tf}>
-                  {tf}
-                </option>
-              ))}
-              <option value="custom">Custom</option>
-            </select>
-          </div>
-          {!TIME_FRAMES.includes(form.timeframe as (typeof TIME_FRAMES)[number]) ? (
-            <div className="space-y-1.5 md:col-span-4">
-              <Label htmlFor="note-tf-custom" className="text-slate-600">
-                Custom time frame
-              </Label>
-              <Input
-                id="note-tf-custom"
-                className={fieldClass}
-                placeholder="e.g. 75m"
-                value={form.timeframe}
-                onChange={(e) => setForm((f) => ({ ...f, timeframe: e.target.value }))}
-              />
-            </div>
-          ) : null}
           <div className="space-y-1.5 md:col-span-4">
             <Label htmlFor="note-thoughts" className="text-slate-600">
               Thoughts
@@ -227,10 +234,44 @@ export function TimeframeJournal() {
               id="note-thoughts"
               rows={5}
               className="w-full rounded-lg border border-input bg-white px-2.5 py-2 text-sm text-slate-900 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              placeholder="What you see on this time frame…"
+              placeholder="What you see…"
               value={form.thoughts}
               onChange={(e) => setForm((f) => ({ ...f, thoughts: e.target.value }))}
               required
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="note-verdict" className="text-slate-600">
+              Verdict
+            </Label>
+            <select
+              id="note-verdict"
+              className={fieldClass}
+              value={form.verdict}
+              onChange={(e) => setForm((f) => ({ ...f, verdict: e.target.value as TrialVerdict }))}
+            >
+              {VERDICTS.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="note-tstat" className="text-slate-600">
+              t-stat (optional)
+            </Label>
+            <Input
+              id="note-tstat"
+              type="number"
+              step="any"
+              className={fieldClass}
+              placeholder="> 3.0 to survive"
+              value={form.tStat ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm((f) => ({ ...f, tStat: v === "" ? null : Number(v) }));
+              }}
             />
           </div>
           <Button type="submit" className="h-8">
@@ -256,13 +297,38 @@ export function TimeframeJournal() {
                   <p className="font-mono text-sm tabular-nums">
                     #{row.serial}
                     <span className="mx-2 text-slate-400">·</span>
-                    {row.date} {row.time}
-                    <span className="mx-2 text-slate-400">·</span>
-                    {row.timeframe}
+                    {formatDate(row.date)} {row.time}
+                    {row.timeframe ? (
+                      <>
+                        <span className="mx-2 text-slate-400">·</span>
+                        {row.timeframe}
+                      </>
+                    ) : null}
+                    {row.tStat != null ? (
+                      <>
+                        <span className="mx-2 text-slate-400">·</span>
+                        t {row.tStat.toFixed(2)}
+                        {row.tStat > 3 ? "" : " (below 3.0)"}
+                      </>
+                    ) : null}
                   </p>
-                  <Button type="button" variant="ghost" size="xs" onClick={() => removeNote(row.id)}>
-                    Remove
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <select
+                      className="h-7 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800"
+                      value={row.verdict}
+                      onChange={(e) => setVerdict(row.id, e.target.value as TrialVerdict)}
+                      aria-label={`Verdict for note ${row.serial}`}
+                    >
+                      {VERDICTS.map((v) => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                    <Button type="button" variant="ghost" size="xs" onClick={() => removeNote(row.id)}>
+                      Remove
+                    </Button>
+                  </div>
                 </div>
                 <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
                   {row.thoughts}

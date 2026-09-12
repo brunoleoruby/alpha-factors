@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { EquityChart } from "@/components/desk/equity-chart";
+import { LiveBookStrip } from "@/components/desk/live-book-strip";
 import { FUND, NAV_SERIES, POSITIONS, RISK_NOTES, SLEEVES } from "@/lib/fund/book";
 import { formatPct, formatUsd, pnlClass } from "@/lib/format";
 
@@ -51,10 +52,12 @@ export function FundDashboard() {
             </p>
           </div>
           <p className="text-muted-foreground max-w-xs text-sm leading-relaxed md:text-right">
-            Illustrative book — swap figures and layout as the desk evolves.
+            Sample partner book below. Your real blotter (after costs) sits under the title.
           </p>
         </div>
       </header>
+
+      <LiveBookStrip />
 
       <section className="animate-in fade-in slide-in-from-bottom-3 border-border grid grid-cols-2 gap-x-6 gap-y-8 border-y py-8 duration-700 delay-100 md:grid-cols-4 xl:grid-cols-8">
         <Stat label="AUM" value={formatUsd(FUND.aum)} />
@@ -62,10 +65,13 @@ export function FundDashboard() {
         <Stat label="MTD" value={formatPct(FUND.mtd)} tone={FUND.mtd} />
         <Stat label="YTD" value={formatPct(FUND.ytd)} tone={FUND.ytd} />
         <Stat label="ITD" value={formatPct(FUND.itd)} tone={FUND.itd} />
-        <Stat label="Sharpe" value={FUND.sharpe.toFixed(2)} />
+        <Stat label="Sharpe*" value={FUND.sharpe.toFixed(2)} />
         <Stat label="Vol" value={`${(FUND.vol * 100).toFixed(1)}%`} />
         <Stat label="Max DD" value={formatPct(FUND.maxDd)} tone={FUND.maxDd} />
       </section>
+      <p className="text-muted-foreground -mt-8 text-xs">
+        *Sample Sharpe on the illustrative book, not a live statistic. Real numbers are in Your blotter.
+      </p>
 
       <section className="animate-in fade-in slide-in-from-bottom-4 grid gap-12 duration-700 delay-150 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,0.85fr)] lg:gap-16">
         <div>

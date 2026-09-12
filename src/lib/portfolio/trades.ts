@@ -15,16 +15,28 @@ export const SEGMENTS: { id: TradeSegment; label: string }[] = [
   { id: "commodity", label: "Commodity" },
 ];
 
+export type TradeSource = "desk" | "file";
+
+/** One Zerodha/Fyers fill. Matches console tradebook rows (Trade ID is unique). */
 export type Trade = {
   id: string;
   date: string;
   symbol: string;
+  isin: string;
+  exchange: string;
+  series: string;
+  venueSegment: string;
   side: TradeSide;
+  auction: boolean;
   qty: number;
   price: number;
+  tradeId: string;
+  orderId: string;
+  executedAt: string;
   account: TradeAccount;
   segment: TradeSegment;
   notes: string;
+  source: TradeSource;
 };
 
 const KEY = "alpha-factors.trades.v2";
@@ -54,9 +66,18 @@ export function emptyTradeForm(): Omit<Trade, "id"> {
     side: "Buy",
     qty: 0,
     price: 0,
+    isin: "",
+    exchange: "NSE",
+    series: "EQ",
+    venueSegment: "EQ",
+    auction: false,
+    tradeId: "",
+    orderId: "",
+    executedAt: "",
     account: "zerodha-tr8076",
     segment: "equity",
     notes: "",
+    source: "desk",
   };
 }
 
@@ -69,9 +90,18 @@ function normalize(raw: Record<string, unknown>): Trade | null {
     side: raw.side === "Sell" ? "Sell" : "Buy",
     qty: Number(raw.qty) || 0,
     price: Number(raw.price) || 0,
+    isin: typeof raw.isin === "string" ? raw.isin : "",
+    exchange: typeof raw.exchange === "string" ? raw.exchange : "",
+    series: typeof raw.series === "string" ? raw.series : "",
+    venueSegment: typeof raw.venueSegment === "string" ? raw.venueSegment : "",
+    auction: raw.auction === true || raw.auction === "true",
+    tradeId: typeof raw.tradeId === "string" ? raw.tradeId : "",
+    orderId: typeof raw.orderId === "string" ? raw.orderId : "",
+    executedAt: typeof raw.executedAt === "string" ? raw.executedAt : "",
     account: isAccount(raw.account) ? raw.account : "zerodha-tr8076",
     segment: isSegment(raw.segment) ? raw.segment : "equity",
     notes: typeof raw.notes === "string" ? raw.notes : "",
+    source: raw.source === "file" ? "file" : "desk",
   };
 }
 

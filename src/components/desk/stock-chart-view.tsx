@@ -31,7 +31,7 @@ export function StockChartView({
         </div>
         <div className="flex flex-wrap gap-2 text-sm">
           <Link href={backHref} className="border-primary/25 hover:border-primary/50 rounded-full border px-3 py-1">
-            All stocks
+            {locale === "NSE" ? "NSE" : "US"}
           </Link>
           <Link href={deskHref} className="border-primary/25 hover:border-primary/50 rounded-full border px-3 py-1">
             Pattern desk
