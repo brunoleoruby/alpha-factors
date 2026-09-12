@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "cn";
+import { HeaderSaveButton } from "@/components/desk/header-save";
 
 function isEnvironment(path: string) {
   return path.startsWith("/environment") || path.startsWith("/nse/environment");
@@ -16,8 +17,12 @@ function isTimeframe(path: string) {
   return path.startsWith("/timeframe");
 }
 
+function isSector(path: string) {
+  return path.startsWith("/sector");
+}
+
 function isGlobalTab(path: string) {
-  return isEnvironment(path) || isPortfolio(path) || isTimeframe(path);
+  return isEnvironment(path) || isPortfolio(path) || isTimeframe(path) || isSector(path);
 }
 
 const links = [
@@ -35,12 +40,10 @@ const links = [
 
 export function ExchangeNav() {
   const path = usePathname();
-  const onNse = path.startsWith("/nse");
-  const allStocksHref = onNse && !isGlobalTab(path) ? "/nse/stocks" : "/stocks";
-  const allStocksActive = onNse ? path.startsWith("/nse/stocks") : path.startsWith("/stocks");
   const envActive = isEnvironment(path);
   const portfolioActive = isPortfolio(path);
   const timeframeActive = isTimeframe(path);
+  const sectorActive = isSector(path);
   return (
     <div className="border-border sticky top-0 z-50 flex flex-wrap items-center gap-1 border-b bg-[#1e5a9a] px-4 py-3 md:px-8">
       <Link href="/" className="mr-6 flex items-baseline gap-3">
@@ -64,15 +67,6 @@ export function ExchangeNav() {
           </Link>
         );
       })}
-      <Link
-        href={allStocksHref}
-        className={cn(
-          "ml-2 rounded-md px-3 py-1 text-sm",
-          allStocksActive ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent",
-        )}
-      >
-        All stocks
-      </Link>
       <Link
         href="/environment"
         className={cn(
@@ -100,6 +94,16 @@ export function ExchangeNav() {
       >
         Time frame
       </Link>
+      <Link
+        href="/sector"
+        className={cn(
+          "rounded-md px-3 py-1 text-sm",
+          sectorActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent",
+        )}
+      >
+        Sector analysis
+      </Link>
+      <HeaderSaveButton />
     </div>
   );
 }
@@ -135,7 +139,11 @@ export function NseSubnav() {
     <PillNav
       items={[
         { href: "/nse", label: "Pattern desk", active: (p) => p === "/nse" },
-        { href: "/nse/stocks", label: "All stocks", active: (p) => p.startsWith("/nse/stocks") },
+        {
+          href: "/nse/stocks",
+          label: "Nifty 50",
+          active: (p) => p.startsWith("/nse/stocks"),
+        },
         { href: "/nse/cases/polycab", label: "Polycab case", active: (p) => p.startsWith("/nse/cases/polycab") },
         { href: "/nse/cases/insider", label: "Insider trading", active: (p) => p.startsWith("/nse/cases/insider") },
         {
@@ -154,7 +162,7 @@ export function UsSubnav() {
       items={[
         { href: "/", label: "Dashboard", active: (p) => p === "/" },
         { href: "/desk", label: "Pattern desk", active: (p) => p.startsWith("/desk") },
-        { href: "/stocks", label: "All stocks", active: (p) => p.startsWith("/stocks") },
+        { href: "/stocks", label: "Top 50", active: (p) => p.startsWith("/stocks") },
       ]}
     />
   );
