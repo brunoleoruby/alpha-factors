@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "cn";
 import { HeaderSaveButton } from "@/components/desk/header-save";
+import { DeskAssistant } from "@/components/desk/desk-assistant";
 
 function isEnvironment(path: string) {
   return path.startsWith("/environment") || path.startsWith("/nse/environment");
@@ -104,6 +105,7 @@ export function ExchangeNav() {
         Sector analysis
       </Link>
       <HeaderSaveButton />
+      <DeskAssistant />
     </div>
   );
 }

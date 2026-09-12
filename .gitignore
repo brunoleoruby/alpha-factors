@@ -33,8 +33,12 @@ yarn-error.log*
 # local trade book (do not commit fills)
 /data/trades.json
 /data/trades.json.tmp
+/data/positions.json
+/data/positions.json.tmp
 /data/timeframe-notes.json
 /data/timeframe-notes.json.tmp
+/data/imports/*
+!/data/imports/.gitkeep
 
 # vercel
 .vercel

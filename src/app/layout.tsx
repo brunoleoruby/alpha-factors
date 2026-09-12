@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Geist, Geist_Mono } from "next/font/google";
-import { ExchangeNav } from "@/components/desk/exchange-nav";
+import { DeskChrome } from "@/components/desk/desk-chrome";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
@@ -33,8 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <TooltipProvider>
-          <ExchangeNav />
-          {children}
+          <DeskChrome>{children}</DeskChrome>
         </TooltipProvider>
       </body>
     </html>
