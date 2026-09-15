@@ -33,7 +33,7 @@ export function DeskAssistant() {
     {
       role: "assistant",
       content:
-        "Desk assistant for the whole app — US/NSE, Nifty 50, environment, portfolio, time frame, and sector analysis. Ask any desk.",
+        "Desk assistant for the whole app — US/NSE, Nifty 50, environment, portfolio, time frame, sector analysis, and IPO. Ask any desk.",
     },
   ]);
   const endRef = useRef<HTMLDivElement | null>(null);

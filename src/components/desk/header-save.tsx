@@ -39,7 +39,7 @@ export function HeaderSaveButton() {
   return (
     <Button
       type="button"
-      className="ml-2 shrink-0 bg-white text-slate-900 hover:bg-white/90"
+      className="ml-2 shrink-0 bg-foreground text-background hover:bg-foreground/90"
       disabled={!action.dirty || action.busy}
       onClick={onClick}
     >

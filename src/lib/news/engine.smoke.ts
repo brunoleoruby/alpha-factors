@@ -1,5 +1,6 @@
 import { NSE_LISTINGS } from "../markets/nse";
 import { ENV_COLUMNS, ENV_YAHOO_SYMBOLS } from "../markets/environment";
+import { breadthTone } from "../markets/nse-breadth";
 import { findSwings } from "../markets/swings";
 import type { Candle } from "../markets/tv";
 import { classifyHeadline } from "./classify";
@@ -104,6 +105,13 @@ if (new Set(ENV_YAHOO_SYMBOLS).size !== ENV_YAHOO_SYMBOLS.length) {
 const indiaIds = ENV_COLUMNS.find((c) => c.id === "india")?.rows.map((r) => r.id) ?? [];
 if (indiaIds.join(",") !== "nifty,smallcap,midcap,banknifty,indiavix") {
   throw new Error(`unexpected Indian indices: ${indiaIds.join(",")}`);
+}
+const asiaIds = ENV_COLUMNS.find((c) => c.id === "asia")?.rows.map((r) => r.id) ?? [];
+if (!asiaIds.includes("giftnifty") || asiaIds[0] !== "giftnifty") {
+  throw new Error(`GIFT Nifty must lead Asia indices: ${asiaIds.join(",")}`);
+}
+if (breadthTone(0.7) !== "gain" || breadthTone(0.3) !== "loss" || breadthTone(0.5) !== "flat") {
+  throw new Error("NSE breadth tone bands are wrong");
 }
 
 console.log(

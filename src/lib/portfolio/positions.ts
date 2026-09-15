@@ -8,6 +8,8 @@ import {
   type TradeSource,
 } from "./trades";
 
+export type BookSide = "long" | "short";
+
 export type PositionLine = {
   id: string;
   symbol: string;
@@ -21,6 +23,7 @@ export type PositionLine = {
   sellValue: number;
   buyPrice: number;
   sellPrice: number;
+  riskAmount: number;
   realizedPnl: number;
   realizedPnlPct: number;
   prevClose: number;
@@ -29,6 +32,7 @@ export type PositionLine = {
   openValue: number;
   unrealizedPnl: number;
   unrealizedPnlPct: number;
+  side: BookSide;
   account: TradeAccount;
   segment: TradeSegment;
   source: TradeSource;
@@ -53,16 +57,20 @@ export function sliceKey(account: TradeAccount, segment: TradeSegment) {
   return `${account}|${segment}`;
 }
 
+export type AccountCapitals = Partial<Record<TradeAccount, number>>;
+
 export type PositionBook = {
   positions: PositionLine[];
   summary: PnlSummary | null;
   summaries: AccountSummaries;
+  totalCapital: number;
+  accountCapitals: AccountCapitals;
 };
 
 const KEY = "alpha-factors.positions.v1";
 
 export function emptyPositionBook(): PositionBook {
-  return { positions: [], summary: null, summaries: {} };
+  return { positions: [], summary: null, summaries: {}, totalCapital: 0, accountCapitals: {} };
 }
 
 function isAccount(value: unknown): value is TradeAccount {
@@ -90,6 +98,34 @@ export function positionId(account: TradeAccount, segment: TradeSegment, symbol:
   return `pos-${account}-${segment}-${symbol}`;
 }
 
+function isBookSide(value: unknown): value is BookSide {
+  return value === "long" || value === "short";
+}
+
+export function inferBookSide(row: {
+  side?: string;
+  buyDate?: string;
+  sellDate?: string;
+  openQtyType?: string;
+  openQty?: number;
+}): BookSide {
+  if (row.side === "short" || row.side === "long") return row.side;
+  const type = (row.openQtyType ?? "").toLowerCase();
+  if (type.includes("short") || (row.openQty ?? 0) < 0) return "short";
+  if (row.buyDate && row.sellDate && row.sellDate < row.buyDate) return "short";
+  return "long";
+}
+
+/** Open date: buy for long, sell for short. */
+export function entryDate(row: Pick<PositionLine, "side" | "buyDate" | "sellDate" | "openQtyType" | "openQty">) {
+  return inferBookSide(row) === "short" ? row.sellDate : row.buyDate;
+}
+
+/** Close date: sell for long, buy (cover) for short. */
+export function exitDate(row: Pick<PositionLine, "side" | "buyDate" | "sellDate" | "openQtyType" | "openQty">) {
+  return inferBookSide(row) === "short" ? row.buyDate : row.sellDate;
+}
+
 function num(value: unknown) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -99,27 +135,36 @@ export function normalizePosition(raw: Record<string, unknown>): PositionLine | 
   if (typeof raw.id !== "string" || typeof raw.symbol !== "string") return null;
   const symbol = raw.symbol.trim().toUpperCase();
   if (!symbol) return null;
+  const buyDate = typeof raw.buyDate === "string" ? raw.buyDate : "";
+  const sellDate = typeof raw.sellDate === "string" ? raw.sellDate : "";
+  const openQty = num(raw.openQty);
+  const openQtyType = typeof raw.openQtyType === "string" ? raw.openQtyType : "";
+  const side = isBookSide(raw.side)
+    ? raw.side
+    : inferBookSide({ buyDate, sellDate, openQtyType, openQty });
   return {
     id: raw.id,
     symbol,
     isin: typeof raw.isin === "string" ? raw.isin : "",
     from: typeof raw.from === "string" ? raw.from : "",
     to: typeof raw.to === "string" ? raw.to : "",
-    buyDate: typeof raw.buyDate === "string" ? raw.buyDate : "",
-    sellDate: typeof raw.sellDate === "string" ? raw.sellDate : "",
+    buyDate,
+    sellDate,
     quantity: num(raw.quantity),
     buyValue: num(raw.buyValue),
     sellValue: num(raw.sellValue),
     buyPrice: num(raw.buyPrice),
     sellPrice: num(raw.sellPrice),
+    riskAmount: num(raw.riskAmount),
     realizedPnl: num(raw.realizedPnl),
     realizedPnlPct: num(raw.realizedPnlPct),
     prevClose: num(raw.prevClose),
-    openQty: num(raw.openQty),
-    openQtyType: typeof raw.openQtyType === "string" ? raw.openQtyType : "",
+    openQty,
+    openQtyType,
     openValue: num(raw.openValue),
     unrealizedPnl: num(raw.unrealizedPnl),
     unrealizedPnlPct: num(raw.unrealizedPnlPct),
+    side,
     account: isAccount(raw.account) ? raw.account : "zerodha-tr8076",
     segment: isSegment(raw.segment) ? raw.segment : "equity",
     source: raw.source === "file" ? "file" : "desk",
@@ -154,7 +199,40 @@ export function parsePositionBook(raw: unknown): PositionBook {
     }
     return row;
   });
-  return { positions, summary: summary ?? Object.values(summaries)[0] ?? null, summaries };
+  return {
+    positions,
+    summary: summary ?? Object.values(summaries)[0] ?? null,
+    summaries,
+    totalCapital: num(rec.totalCapital),
+    accountCapitals: parseAccountCapitals(rec.accountCapitals),
+  };
+}
+
+function parseAccountCapitals(raw: unknown): AccountCapitals {
+  const out: AccountCapitals = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (isAccount(key)) out[key] = num(value);
+  }
+  return out;
+}
+
+export function capitalForView(
+  view: "all" | TradeAccount,
+  totalCapital: number,
+  accountCapitals: AccountCapitals,
+) {
+  if (view === "all") return totalCapital;
+  return num(accountCapitals[view]);
+}
+
+export function mergeAccountCapitals(primary: AccountCapitals, fallback: AccountCapitals): AccountCapitals {
+  const out: AccountCapitals = { ...fallback };
+  for (const row of ACCOUNTS) {
+    const n = num(primary[row.id]);
+    if (n > 0) out[row.id] = n;
+  }
+  return out;
 }
 
 function parseSummaries(raw: unknown): AccountSummaries {
@@ -222,6 +300,9 @@ export function mergeFilePositions(existing: PositionLine[], incoming: PositionL
       source: old.source === "desk" ? "desk" : row.source,
       buyPrice: old.buyPrice || row.buyPrice,
       sellPrice: old.sellPrice || row.sellPrice,
+      quantity: old.quantity || row.quantity,
+      riskAmount: old.riskAmount || row.riskAmount,
+      side: old.side || row.side,
       ...(old.buyPrice || old.sellPrice
         ? {
             buyValue: old.buyPrice ? old.buyValue : row.buyValue,
@@ -313,12 +394,22 @@ export function applyTradePrices(row: PositionLine, buyPrice: number, sellPrice:
   };
 }
 
-export function holdingDays(row: Pick<PositionLine, "buyDate" | "sellDate">) {
-  if (!row.buyDate || !row.sellDate) return null;
-  const buy = Date.parse(row.buyDate);
-  const sell = Date.parse(row.sellDate);
-  if (Number.isNaN(buy) || Number.isNaN(sell)) return null;
-  return Math.round((sell - buy) / 86_400_000);
+export function holdingDays(
+  row: Pick<PositionLine, "buyDate" | "sellDate" | "side" | "openQtyType" | "openQty">,
+) {
+  const open = entryDate(row);
+  const close = exitDate(row);
+  if (!open || !close) return null;
+  const a = Date.parse(open);
+  const b = Date.parse(close);
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return Math.round((b - a) / 86_400_000);
+}
+
+/** Realized P&L divided by rupees you were willing to lose. */
+export function riskRewardRatio(realizedPnl: number, riskAmount: number) {
+  if (!(riskAmount > 0)) return null;
+  return realizedPnl / riskAmount;
 }
 
 export { accountLabel, segmentLabel };

@@ -22,8 +22,12 @@ function isSector(path: string) {
   return path.startsWith("/sector");
 }
 
+function isIpo(path: string) {
+  return path.startsWith("/ipo");
+}
+
 function isGlobalTab(path: string) {
-  return isEnvironment(path) || isPortfolio(path) || isTimeframe(path) || isSector(path);
+  return isEnvironment(path) || isPortfolio(path) || isTimeframe(path) || isSector(path) || isIpo(path);
 }
 
 const links = [
@@ -45,13 +49,11 @@ export function ExchangeNav() {
   const portfolioActive = isPortfolio(path);
   const timeframeActive = isTimeframe(path);
   const sectorActive = isSector(path);
+  const ipoActive = isIpo(path);
   return (
-    <div className="border-border sticky top-0 z-50 flex flex-wrap items-center gap-1 border-b bg-[#1e5a9a] px-4 py-3 md:px-8">
-      <Link href="/" className="mr-6 flex items-baseline gap-3">
-        <span className="font-heading text-lg tracking-wide">Alpha Factors 2.0</span>
-        <span className="text-muted-foreground hidden text-[10px] tracking-[0.22em] uppercase sm:inline">
-          Capital
-        </span>
+    <div className="border-border/80 bg-background/90 sticky top-0 z-50 flex flex-wrap items-center gap-1 border-b px-4 py-3 backdrop-blur-md md:px-8">
+      <Link href="/" className="mr-6">
+        <span className="font-heading text-lg tracking-wide">Eminent Corpus</span>
       </Link>
       {links.map((l) => {
         const active = l.match(path);
@@ -103,6 +105,15 @@ export function ExchangeNav() {
         )}
       >
         Sector analysis
+      </Link>
+      <Link
+        href="/ipo"
+        className={cn(
+          "rounded-md px-3 py-1 text-sm",
+          ipoActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent",
+        )}
+      >
+        IPO
       </Link>
       <HeaderSaveButton />
       <DeskAssistant />

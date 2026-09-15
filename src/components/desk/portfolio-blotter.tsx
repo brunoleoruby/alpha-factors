@@ -1,26 +1,35 @@
 "use client";
 
-import { FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { ProfitShareCard } from "@/components/desk/profit-share-card";
 import { useHeaderSave } from "@/components/desk/header-save";
 import { EquityChart } from "@/components/desk/equity-chart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatDate, formatNum, formatPct, pnlClass } from "@/lib/format";
-import { analyzePositions, money, portfolioCurve, summaryForView } from "@/lib/portfolio/analytics";
+import { formatDate, formatNum, formatPct, formatRr, pnlClass, toDayMonthYear, toIsoDate } from "@/lib/format";
+import { analyzePositions, annualizedOnCapital, hitRateByBuyDate, money, portfolioCurve, profitBySellDate, returnOnCapital, summaryForView, type HitRateBucket, type ProfitBucket } from "@/lib/portfolio/analytics";
+import { downloadProfitSharePng, profitShareText } from "@/lib/portfolio/share-profit";
 import {
   applyTradePrices,
   buyAvg,
+  capitalForView,
   emptyPositionForm,
   holdingDays,
+  inferBookSide,
   loadPositionBook,
   parsePositionBook,
   positionId,
+  mergeAccountCapitals,
   mergeFilePositions,
   mergeSummaries,
   savePositionBook,
   sellAvg,
   sliceKey,
+  riskRewardRatio,
+  type AccountCapitals,
+  type BookSide,
   type PositionBook,
   type PositionLine,
   type AccountSummaries,
@@ -36,7 +45,7 @@ import {
 } from "@/lib/portfolio/trades";
 
 const fieldClass =
-  "h-8 w-full rounded-lg border border-input bg-white px-2.5 text-sm text-slate-900";
+  "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm text-foreground";
 
 type SortKey =
   | "symbol"
@@ -52,6 +61,10 @@ type SortKey =
   | "sellAvg"
   | "realized"
   | "realizedPct"
+  | "riskAmount"
+  | "riskReward"
+  | "onCapital"
+  | "side"
   | "openQty"
   | "openValue"
   | "unrealized"
@@ -87,6 +100,14 @@ function sortValue(row: PositionLine, key: SortKey): string | number {
       return row.realizedPnl;
     case "realizedPct":
       return row.realizedPnlPct;
+    case "riskAmount":
+      return row.riskAmount;
+    case "riskReward":
+      return riskRewardRatio(row.realizedPnl, row.riskAmount) ?? -Infinity;
+    case "onCapital":
+      return row.realizedPnl;
+    case "side":
+      return inferBookSide(row);
     case "openQty":
       return row.openQty;
     case "openValue":
@@ -114,7 +135,7 @@ function sortRows(rows: PositionLine[], sort: SortState) {
 
 function toggleSort(prev: SortState, key: SortKey): SortState {
   if (prev.key === key) return { key, dir: prev.dir === "asc" ? "desc" : "asc" };
-  return { key, dir: key === "symbol" || key === "buyDate" || key === "sellDate" || key === "from" || key === "to" || key === "account" ? "asc" : "desc" };
+  return { key, dir: key === "symbol" || key === "buyDate" || key === "sellDate" || key === "from" || key === "to" || key === "account" || key === "side" ? "asc" : "desc" };
 }
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: number }) {
@@ -144,16 +165,29 @@ export function PortfolioBlotter() {
   const [autoFetch, setAutoFetch] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editRows, setEditRows] = useState(false);
   const [editBuy, setEditBuy] = useState("");
   const [editSell, setEditSell] = useState("");
   const [editBuyPx, setEditBuyPx] = useState("");
   const [editSellPx, setEditSellPx] = useState("");
+  const [editQty, setEditQty] = useState("");
+  const [editSide, setEditSide] = useState<BookSide>("long");
+  const [editRisk, setEditRisk] = useState("");
+  const [journalId, setJournalId] = useState<string | null>(null);
+  const [journalText, setJournalText] = useState("");
   const [realizedSort, setRealizedSort] = useState<SortState>({ key: "realized", dir: "desc" });
   const [bookSort, setBookSort] = useState<SortState>({ key: "symbol", dir: "asc" });
   const [bookView, setBookView] = useState<"all" | TradeAccount>("all");
   const [segmentView, setSegmentView] = useState<"all" | TradeSegment>("all");
   const [dirty, setDirty] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
+  const [totalCapital, setTotalCapital] = useState(0);
+  const [accountCapitals, setAccountCapitals] = useState<AccountCapitals>({});
+  const [capitalText, setCapitalText] = useState("");
+  const [editCapital, setEditCapital] = useState(false);
+  const [shareNote, setShareNote] = useState<string | null>(null);
+  const [showShareTable, setShowShareTable] = useState(false);
+  const shareCardRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -167,12 +201,20 @@ export function PortfolioBlotter() {
         const disk = parsePositionBook(body);
         if (dead) return;
         if (disk.positions.length || disk.summary || Object.keys(disk.summaries).length) {
+          const capital = disk.totalCapital || local.totalCapital;
+          const capitals = mergeAccountCapitals(disk.accountCapitals, local.accountCapitals);
           setPositions(disk.positions);
           setSummaries(disk.summaries);
-          savePositionBook(disk);
+          setTotalCapital(capital);
+          setAccountCapitals(capitals);
+          setCapitalText(capital > 0 ? String(capital) : "");
+          savePositionBook({ ...disk, totalCapital: capital, accountCapitals: capitals });
         } else if (local.positions.length) {
           setPositions(local.positions);
           setSummaries(local.summaries);
+          setTotalCapital(local.totalCapital);
+          setAccountCapitals(local.accountCapitals);
+          setCapitalText(local.totalCapital > 0 ? String(local.totalCapital) : "");
           await fetch("/api/portfolio/positions", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -184,6 +226,9 @@ export function PortfolioBlotter() {
         if (dead) return;
         setPositions(local.positions);
         setSummaries(local.summaries);
+        setTotalCapital(local.totalCapital);
+        setAccountCapitals(local.accountCapitals);
+        setCapitalText(local.totalCapital > 0 ? String(local.totalCapital) : "");
         setPersist("browser");
       } finally {
         if (!dead) setReady(true);
@@ -234,13 +279,106 @@ export function PortfolioBlotter() {
   const someSelected = viewRows.some((row) => selectedSet.has(row.id)) && !allSelected;
   const ranked = useMemo(() => sortRows(viewRows, realizedSort), [viewRows, realizedSort]);
   const bookRows = useMemo(() => sortRows(viewRows, bookSort), [viewRows, bookSort]);
+  const viewCapital = useMemo(
+    () => capitalForView(bookView, totalCapital, accountCapitals),
+    [bookView, totalCapital, accountCapitals],
+  );
+  const roc = useMemo(() => returnOnCapital(analytics.netPnl, viewCapital), [analytics.netPnl, viewCapital]);
+  const ann = useMemo(
+    () => annualizedOnCapital(roc, viewSummary?.from, viewSummary?.to),
+    [roc, viewSummary?.from, viewSummary?.to],
+  );
+  const deployed = useMemo(
+    () => viewRows.reduce((sum, row) => sum + row.buyValue, 0),
+    [viewRows],
+  );
+  const utilization = useMemo(() => returnOnCapital(deployed, viewCapital), [deployed, viewCapital]);
   const curve = useMemo(() => portfolioCurve(viewRows, viewSummary), [viewRows, viewSummary]);
+  const hitRates = useMemo(() => hitRateByBuyDate(viewRows), [viewRows]);
+  const sellProfits = useMemo(() => profitBySellDate(viewRows), [viewRows]);
+  const sharePayload = useMemo(
+    () => ({
+      bookLabel:
+        bookView === "all"
+          ? "All accounts"
+          : `${accountLabel(bookView)}${segmentView === "all" ? "" : ` · ${segmentLabel(segmentView)}`}`,
+      from: viewSummary?.from,
+      to: viewSummary?.to,
+      capital: viewCapital,
+      netPnl: analytics.netPnl,
+      roc,
+      annualized: ann,
+      hitRate: hitRates.hitRate,
+      hits: hitRates.hits,
+      misses: hitRates.misses,
+      hitDated: hitRates.dated,
+      profits: sellProfits,
+    }),
+    [
+      bookView,
+      segmentView,
+      viewSummary,
+      viewCapital,
+      analytics.netPnl,
+      roc,
+      ann,
+      hitRates.hitRate,
+      hitRates.hits,
+      hitRates.misses,
+      hitRates.dated,
+      sellProfits,
+    ],
+  );
+
+  async function copyProfitShare() {
+    const text = profitShareText(sharePayload);
+    try {
+      await navigator.clipboard.writeText(text);
+      setShareNote("Copied. Paste into WhatsApp, X, or a caption.");
+    } catch {
+      setShareNote("Could not copy. Select the text after Download image instead.");
+    }
+  }
+
+  async function shareProfit() {
+    const text = profitShareText(sharePayload);
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "Eminent Corpus", text });
+        setShareNote("Shared.");
+        return;
+      } catch {
+        /* user cancelled or share failed — fall through to copy */
+      }
+    }
+    await copyProfitShare();
+  }
+
+  async function downloadShareTable() {
+    if (!showShareTable) {
+      flushSync(() => setShowShareTable(true));
+    }
+    const card = shareCardRef.current;
+    if (!card) {
+      setShareNote("Table card is not ready. Show the share table and try again.");
+      return;
+    }
+    try {
+      await downloadProfitSharePng(card);
+      setShareNote("Saved eminent-corpus-profit-table.png — that’s a screenshot of the share table.");
+    } catch {
+      setShareNote("Could not save the table image. Use File → Force Reload, then try again.");
+    }
+  }
 
   function setView(next: "all" | TradeAccount) {
+    const nextCapital = capitalForView(next, totalCapital, accountCapitals);
     setBookView(next);
     setSegmentView("all");
     setSelected([]);
     setEditingId(null);
+    setEditCapital(false);
+    setCapitalText(nextCapital > 0 ? String(nextCapital) : "");
     if (next !== "all") setForm((f) => ({ ...f, account: next }));
   }
 
@@ -256,6 +394,8 @@ export function PortfolioBlotter() {
       positions,
       summary: Object.values(summaries)[0] ?? null,
       summaries,
+      totalCapital,
+      accountCapitals,
     };
     setSaveBusy(true);
     setError(null);
@@ -275,7 +415,7 @@ export function PortfolioBlotter() {
     } finally {
       setSaveBusy(false);
     }
-  }, [positions, summaries]);
+  }, [positions, summaries, totalCapital, accountCapitals]);
 
   useHeaderSave({ dirty, busy: saveBusy, onSave: persistBook });
 
@@ -306,6 +446,7 @@ export function PortfolioBlotter() {
       sellValue: form.side === "Sell" ? notional : 0,
       buyPrice: form.side === "Buy" ? form.price : 0,
       sellPrice: form.side === "Sell" ? form.price : 0,
+      riskAmount: 0,
       realizedPnl: form.side === "Sell" ? notional : -notional,
       realizedPnlPct: 0,
       prevClose: form.price,
@@ -314,6 +455,7 @@ export function PortfolioBlotter() {
       openValue: notional,
       unrealizedPnl: 0,
       unrealizedPnlPct: 0,
+      side: form.side === "Sell" ? "short" : "long",
       account: form.account,
       segment: form.segment,
       source: "desk",
@@ -332,22 +474,47 @@ export function PortfolioBlotter() {
 
   function startEdit(row: PositionLine) {
     setEditingId(row.id);
-    setEditBuy(row.buyDate);
-    setEditSell(row.sellDate);
+    setEditBuy(toDayMonthYear(row.buyDate));
+    setEditSell(toDayMonthYear(row.sellDate));
     const buy = buyAvg(row);
     const sell = sellAvg(row);
     setEditBuyPx(buy ? String(Number(buy.toFixed(4))) : "");
     setEditSellPx(sell ? String(Number(sell.toFixed(4))) : "");
+    setEditQty(row.quantity ? String(row.quantity) : "");
+    setEditSide(inferBookSide(row));
+    setEditRisk(row.riskAmount > 0 ? String(Number(row.riskAmount.toFixed(2))) : "");
   }
 
   function saveEdit() {
     if (!editingId) return;
-    if (editBuy && editSell && editSell < editBuy) {
-      setError("Sell date cannot be before buy date.");
+    const buyIso = toIsoDate(editBuy);
+    const sellIso = toIsoDate(editSell);
+    if (editBuy.trim() && !buyIso) {
+      setError("Buy date must be dd-mm-yyyy.");
       return;
+    }
+    if (editSell.trim() && !sellIso) {
+      setError("Sell date must be dd-mm-yyyy.");
+      return;
+    }
+    if (buyIso && sellIso) {
+      if (editSide === "long" && sellIso < buyIso) {
+        setError("On a long, sell date cannot be before buy date.");
+        return;
+      }
+      if (editSide === "short" && buyIso < sellIso) {
+        setError("On a short, buy (cover) date cannot be before sell date.");
+        return;
+      }
     }
     const buyPx = editBuyPx === "" ? 0 : Number(editBuyPx);
     const sellPx = editSellPx === "" ? 0 : Number(editSellPx);
+    const qty = editQty === "" ? 0 : Number(editQty);
+    const riskAmt = editRisk === "" ? 0 : Number(editRisk);
+    if (editQty !== "" && !(qty > 0)) {
+      setError("Quantity must be greater than zero.");
+      return;
+    }
     if (editBuyPx !== "" && !(buyPx > 0)) {
       setError("Buy price must be greater than zero.");
       return;
@@ -356,17 +523,44 @@ export function PortfolioBlotter() {
       setError("Sell price must be greater than zero.");
       return;
     }
+    if (editRisk !== "" && !(riskAmt > 0)) {
+      setError("Risk amount must be greater than zero.");
+      return;
+    }
     setPositions((prev) =>
       prev.map((row) => {
         if (row.id !== editingId) return row;
         return applyTradePrices(
-          { ...row, buyDate: editBuy, sellDate: editSell },
+          {
+            ...row,
+            buyDate: buyIso,
+            sellDate: sellIso,
+            quantity: qty > 0 ? qty : row.quantity,
+            side: editSide,
+            openQtyType: editSide === "short" ? "Short" : "Long",
+            riskAmount: riskAmt,
+          },
           buyPx,
           sellPx,
         );
       }),
     );
     setEditingId(null);
+    setError(null);
+    setDirty(true);
+  }
+
+  function openJournal(row: PositionLine) {
+    setJournalId(row.id);
+    setJournalText(row.notes ?? "");
+  }
+
+  function saveJournal() {
+    if (!journalId) return;
+    const text = journalText.trim();
+    setPositions((prev) => prev.map((row) => (row.id === journalId ? { ...row, notes: text } : row)));
+    setJournalId(null);
+    setJournalText("");
     setError(null);
     setDirty(true);
   }
@@ -418,7 +612,13 @@ export function PortfolioBlotter() {
       });
       const merged = mergeFilePositions(positions, book.positions);
       const nextSummaries = { ...summaries, ...book.summaries };
-      const nextBook = { positions: merged, summary: book.summary, summaries: nextSummaries };
+      const nextBook = {
+        positions: merged,
+        summary: book.summary,
+        summaries: nextSummaries,
+        totalCapital,
+        accountCapitals,
+      };
       setPositions(merged);
       setSummaries(nextSummaries);
       savePositionBook(nextBook);
@@ -515,22 +715,26 @@ export function PortfolioBlotter() {
             type="button"
             onClick={() => setView("all")}
             className={`rounded-xl border px-4 py-3 text-left ${
-              bookView === "all" ? "border-slate-900 bg-white text-slate-900" : "border-border bg-transparent"
+              bookView === "all" ? "border-foreground/35 bg-card text-foreground" : "border-border bg-transparent"
             }`}
           >
-            <p className="text-[10px] tracking-[0.18em] text-slate-500 uppercase">All accounts</p>
+            <p className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">All accounts</p>
             <p className="mt-1 font-medium">Dashboard</p>
-            <p className="mt-2 font-mono text-sm tabular-nums text-slate-600">
+            <p className="mt-2 font-mono text-sm tabular-nums text-muted-foreground">
               {positions.length} names · 3 books
             </p>
             <p className={`mt-1 font-mono text-lg tabular-nums ${pnlClass(allBook.netPnl)}`}>
               {money(allBook.netPnl)}
+            </p>
+            <p className="mt-1 font-mono text-xs tabular-nums text-muted-foreground">
+              Capital {totalCapital > 0 ? money(totalCapital) : "—"}
             </p>
           </button>
           {ACCOUNTS.map((account) => {
             const slice = allBook.byAccount.find((row) => row.id === account.id);
             const names = slice?.trades ?? 0;
             const pnl = slice?.totalPnl ?? 0;
+            const capital = accountCapitals[account.id] ?? 0;
             const on = bookView === account.id;
             return (
               <button
@@ -538,15 +742,18 @@ export function PortfolioBlotter() {
                 type="button"
                 onClick={() => setView(account.id)}
                 className={`rounded-xl border px-4 py-3 text-left ${
-                  on ? "border-slate-900 bg-white text-slate-900" : "border-border bg-transparent"
+                  on ? "border-foreground/35 bg-card text-foreground" : "border-border bg-transparent"
                 }`}
               >
-                <p className="text-[10px] tracking-[0.18em] text-slate-500 uppercase">
+                <p className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
                   {account.broker === account.label ? "Account" : account.broker}
                 </p>
                 <p className="mt-1 font-medium">{account.label}</p>
-                <p className="mt-2 font-mono text-sm tabular-nums text-slate-600">{names} names</p>
+                <p className="mt-2 font-mono text-sm tabular-nums text-muted-foreground">{names} names</p>
                 <p className={`mt-1 font-mono text-lg tabular-nums ${pnlClass(pnl)}`}>{money(pnl)}</p>
+                <p className="mt-1 font-mono text-xs tabular-nums text-muted-foreground">
+                  Capital {capital > 0 ? money(capital) : "—"}
+                </p>
               </button>
             );
           })}
@@ -563,12 +770,12 @@ export function PortfolioBlotter() {
               type="button"
               onClick={() => setSegment("all")}
               className={`rounded-xl border px-4 py-3 text-left ${
-                segmentView === "all" ? "border-slate-900 bg-white text-slate-900" : "border-border bg-transparent"
+                segmentView === "all" ? "border-foreground/35 bg-card text-foreground" : "border-border bg-transparent"
               }`}
             >
-              <p className="text-[10px] tracking-[0.18em] text-slate-500 uppercase">All segments</p>
+              <p className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">All segments</p>
               <p className="mt-1 font-medium">Account book</p>
-              <p className="mt-2 font-mono text-sm tabular-nums text-slate-600">{accountRows.length} names</p>
+              <p className="mt-2 font-mono text-sm tabular-nums text-muted-foreground">{accountRows.length} names</p>
               <p className={`mt-1 font-mono text-lg tabular-nums ${pnlClass(accountBook.netPnl)}`}>
                 {money(accountBook.netPnl)}
               </p>
@@ -584,12 +791,12 @@ export function PortfolioBlotter() {
                   type="button"
                   onClick={() => setSegment(segment.id)}
                   className={`rounded-xl border px-4 py-3 text-left ${
-                    on ? "border-slate-900 bg-white text-slate-900" : "border-border bg-transparent"
+                    on ? "border-foreground/35 bg-card text-foreground" : "border-border bg-transparent"
                   }`}
                 >
-                  <p className="text-[10px] tracking-[0.18em] text-slate-500 uppercase">Segment</p>
+                  <p className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Segment</p>
                   <p className="mt-1 font-medium">{segment.label}</p>
-                  <p className="mt-2 font-mono text-sm tabular-nums text-slate-600">{names} names</p>
+                  <p className="mt-2 font-mono text-sm tabular-nums text-muted-foreground">{names} names</p>
                   <p className={`mt-1 font-mono text-lg tabular-nums ${pnlClass(pnl)}`}>{money(pnl)}</p>
                 </button>
               );
@@ -598,15 +805,15 @@ export function PortfolioBlotter() {
         </section>
       ) : null}
 
-      <section className="rounded-xl bg-white p-4 text-slate-900">
-        <h2 className="text-[11px] font-medium tracking-[0.24em] text-slate-500 uppercase">
+      <section className="rounded-xl bg-card p-4 text-foreground">
+        <h2 className="text-[11px] font-medium tracking-[0.24em] text-muted-foreground uppercase">
           P&amp;L / positions sheet
         </h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-muted-foreground">
           Upload one segment file at a time (e.g. equity, Nifty 50, commodity for TR8076). New names
           are added to that sleeve; existing names stay. Matching symbols are updated, not wiped.
           Other segments and accounts stay. Drop files in{" "}
-          <span className="font-mono text-slate-800">data/imports</span> or choose here.
+          <span className="font-mono text-foreground">data/imports</span> or choose here.
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <input
@@ -626,7 +833,7 @@ export function PortfolioBlotter() {
           <Button type="button" variant="outline" disabled={importBusy} onClick={() => void fetchFromFolder()}>
             Fetch from folder
           </Button>
-          <label className="ml-2 flex items-center gap-2 text-sm text-slate-700">
+          <label className="ml-2 flex items-center gap-2 text-sm text-foreground/80">
             <input
               type="checkbox"
               checked={autoFetch}
@@ -635,8 +842,79 @@ export function PortfolioBlotter() {
             Autofetch every 20s
           </label>
         </div>
-        {importMsg ? <p className="mt-3 text-sm text-slate-600">{importMsg}</p> : null}
+        {importMsg ? <p className="mt-3 text-sm text-muted-foreground">{importMsg}</p> : null}
         {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+      </section>
+
+      <section className="border-border grid gap-6 border-y py-6 md:grid-cols-[minmax(12rem,16rem)_1fr]">
+        <div>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-muted-foreground text-[10px] tracking-[0.22em] uppercase">Total capital</p>
+            <Button
+              type="button"
+              variant={editCapital ? "default" : "outline"}
+              size="xs"
+              onClick={() => {
+                if (editCapital) {
+                  setEditCapital(false);
+                  setCapitalText(viewCapital > 0 ? String(viewCapital) : "");
+                  return;
+                }
+                setCapitalText(viewCapital > 0 ? String(viewCapital) : "");
+                setEditCapital(true);
+              }}
+            >
+              {editCapital ? "Done" : "Edit"}
+            </Button>
+          </div>
+          {editCapital ? (
+            <Input
+              id="total-capital"
+              type="number"
+              min="0"
+              step="any"
+              inputMode="decimal"
+              placeholder="e.g. 1000000"
+              className="mt-2 h-10 bg-card font-mono text-foreground"
+              value={capitalText}
+              onChange={(e) => {
+                const raw = e.target.value;
+                setCapitalText(raw);
+                const n = Number(raw.replace(/,/g, ""));
+                const next = Number.isFinite(n) && n > 0 ? n : 0;
+                if (bookView === "all") setTotalCapital(next);
+                else setAccountCapitals((prev) => ({ ...prev, [bookView]: next }));
+                setDirty(true);
+              }}
+            />
+          ) : (
+            <p className="mt-2 font-mono text-xl tracking-tight tabular-nums md:text-2xl">
+              {viewCapital > 0 ? money(viewCapital) : "—"}
+            </p>
+          )}
+          <p className="text-muted-foreground mt-2 text-xs">
+            {editCapital
+              ? `${bookView === "all" ? "Desk" : accountLabel(bookView)} capital in INR. Return uses this base, not buy value. Save in the header after you change it.`
+              : `Click Edit to change ${bookView === "all" ? "desk" : "this account"} capital. Return uses this base, not buy value.`}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
+          <Stat
+            label="On capital"
+            value={roc == null ? "—" : formatPct(roc)}
+            tone={roc == null ? undefined : roc}
+          />
+          <Stat
+            label="Annualized"
+            value={ann == null ? "—" : formatPct(ann)}
+            tone={ann == null ? undefined : ann}
+          />
+          <Stat label="Deployed" value={money(deployed)} />
+          <Stat
+            label="Capital used"
+            value={utilization == null ? "—" : formatPct(utilization)}
+          />
+        </div>
       </section>
 
       <section className="border-border grid grid-cols-2 gap-x-6 gap-y-6 border-y py-6 md:grid-cols-4 xl:grid-cols-8">
@@ -670,7 +948,13 @@ export function PortfolioBlotter() {
           ? " across all three accounts"
           : ` for ${accountLabel(bookView)}${segmentView === "all" ? " · all segments" : ` · ${segmentLabel(segmentView)}`}`}
         , from the P&amp;L names (row sum). Unrealized P&amp;L is ignored. Net = realized + other C/D − charges.
-        {viewSummary?.from ? ` Period ${formatDate(viewSummary.from)} to ${formatDate(viewSummary.to)}.` : ""} Figures in INR.
+        {viewSummary?.from ? ` Period ${formatDate(viewSummary.from)} to ${formatDate(viewSummary.to)}.` : ""}{" "}
+        {viewCapital > 0
+          ? `Return on ${money(viewCapital)} capital is ${roc == null ? "—" : formatPct(roc)}${
+              ann == null ? "" : `, annualized ${formatPct(ann)}`
+            }.`
+          : "Type total capital above to score return on the book."}{" "}
+        Figures in INR.
       </p>
 
       <section>
@@ -678,8 +962,8 @@ export function PortfolioBlotter() {
           Total portfolio
         </h2>
         <p className="text-muted-foreground -mt-2 mb-4 text-xs">
-          Cumulative net (realized + other C/D − charges) for this view. Names with a sell date plot
-          on that day; the rest use the P&amp;L period end.
+          Cumulative net (realized + other C/D − charges) for this view. Names plot on the exit date
+          (sell for longs, buy/cover for shorts); the rest use the P&amp;L period end.
         </p>
         <EquityChart
           points={curve}
@@ -690,6 +974,107 @@ export function PortfolioBlotter() {
         />
       </section>
 
+      <section>
+        <h2 className="text-muted-foreground mb-4 text-[11px] font-medium tracking-[0.24em] uppercase">
+          Hit rate
+        </h2>
+        <p className="text-muted-foreground -mt-2 mb-4 text-xs">
+          By entry date (buy date on longs, sell date on shorts). A hit is realized P&amp;L above zero.
+          Scratch and still-open names (≈ ₹0) sit in the name count but not the rate. Quarters follow
+          the Indian FY (April start).
+          {hitRates.names - hitRates.dated > 0
+            ? ` ${hitRates.names - hitRates.dated} name${hitRates.names - hitRates.dated === 1 ? "" : "s"} have no entry date.`
+            : ""}
+        </p>
+        {hitRates.dated === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            Add entry dates on names to score month and quarter hit rate.
+          </p>
+        ) : (
+          <div className="grid gap-8 lg:grid-cols-2">
+            <HitRateTable title="By month" rows={hitRates.months} />
+            <HitRateTable title="By quarter" rows={hitRates.quarters} />
+          </div>
+        )}
+        {hitRates.dated > 0 ? (
+          <p className="text-muted-foreground mt-4 text-xs">
+            Overall {hitRates.hits} hit{hitRates.hits === 1 ? "" : "s"} / {hitRates.misses} miss
+            {hitRates.misses === 1 ? "" : "es"}
+            {hitRates.hitRate == null ? "" : ` · ${formatPct(hitRates.hitRate)}`}
+            {` · ${hitRates.dated} name${hitRates.dated === 1 ? "" : "s"} with an entry date.`}
+          </p>
+        ) : null}
+      </section>
+
+      <section>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.24em] uppercase">
+            Profit
+          </h2>
+          {sellProfits.dated > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="xs" onClick={() => void copyProfitShare()}>
+                Copy
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={() => void downloadShareTable()}
+              >
+                Download table
+              </Button>
+              <Button type="button" size="xs" onClick={() => void shareProfit()}>
+                Share
+              </Button>
+            </div>
+          ) : null}
+        </div>
+        <p className="text-muted-foreground -mt-1 mb-4 text-xs">
+          Realized P&amp;L by exit date (sell on longs, buy/cover on shorts). Months, quarters, and
+          Indian FY years. Copy text or download a card for socials.
+          {sellProfits.names - sellProfits.dated > 0
+            ? ` ${sellProfits.names - sellProfits.dated} name${sellProfits.names - sellProfits.dated === 1 ? "" : "s"} have no exit date.`
+            : ""}
+        </p>
+        {sellProfits.dated === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            Add exit dates on names to score month, quarter, and year profit.
+          </p>
+        ) : (
+          <div className="grid gap-8 lg:grid-cols-3">
+            <ProfitTable title="By month" rows={sellProfits.months} />
+            <ProfitTable title="By quarter" rows={sellProfits.quarters} />
+            <ProfitTable title="By year" rows={sellProfits.years} />
+          </div>
+        )}
+        {sellProfits.dated > 0 ? (
+          <>
+            <div className="mt-8">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-muted-foreground text-[10px] tracking-[0.18em] uppercase">
+                  Share table
+                </h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={() => setShowShareTable((open) => !open)}
+                >
+                  {showShareTable ? "Hide" : "Show"}
+                </Button>
+              </div>
+              {showShareTable ? <ProfitShareCard payload={sharePayload} cardRef={shareCardRef} /> : null}
+            </div>
+            <p className="text-muted-foreground mt-4 text-xs">
+              Overall {money(sellProfits.realized)} from {sellProfits.dated} name
+              {sellProfits.dated === 1 ? "" : "s"} with an exit date.
+              {shareNote ? ` ${shareNote}` : ""}
+            </p>
+          </>
+        ) : null}
+      </section>
+
       <section
         className={
           bookView === "all"
@@ -698,62 +1083,123 @@ export function PortfolioBlotter() {
         }
       >
         <div>
-          <h2 className="text-muted-foreground mb-5 text-[11px] font-medium tracking-[0.24em] uppercase">
-            Realized by name
-          </h2>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.24em] uppercase">
+              Realized by name
+            </h2>
+            {ranked.length > 0 ? (
+              <Button
+                type="button"
+                variant={editRows ? "default" : "outline"}
+                size="xs"
+                onClick={() => {
+                  if (editRows) setEditingId(null);
+                  setEditRows((on) => !on);
+                }}
+              >
+                {editRows ? "Done editing" : "Edit rows"}
+              </Button>
+            ) : null}
+          </div>
           <p className="text-muted-foreground -mt-3 mb-4 text-xs">
-            P&amp;L file has no fill dates or trade prices. Edit a name to type buy/sell date and
-            price, save the row, then Save the book. Dates and prices stay when you re-upload the
-            sheet.
+            {editRows
+              ? "Edit side, dates, quantity, price, and risk. Short = sell first, buy later. Save the row, then Save the book. R:R is realized ÷ risk."
+              : "Read-only until you click Edit rows. Journal is per name — write the trade, then Save the book. Short trades: set Side to Short, sell date is the open, buy date is the cover."}
           </p>
           {ranked.length === 0 ? (
             <p className="text-muted-foreground text-sm">Upload a P&amp;L sheet to rank names.</p>
           ) : (
-            <div className="overflow-x-auto rounded-xl bg-white text-slate-900">
+            <div className="overflow-x-auto rounded-xl bg-card text-foreground">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-[10px] tracking-[0.18em] text-slate-500 uppercase">
+                  <tr className="border-b border-border text-left text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
                     <SortTh label="Symbol" column="symbol" sort={realizedSort} onSort={setRealizedSort} />
+                    <SortTh label="Side" column="side" sort={realizedSort} onSort={setRealizedSort} />
                     <SortTh label="Buy date" column="buyDate" sort={realizedSort} onSort={setRealizedSort} />
                     <SortTh label="Sell date" column="sellDate" sort={realizedSort} onSort={setRealizedSort} />
                     <SortTh label="Hold" column="hold" sort={realizedSort} onSort={setRealizedSort} align="right" />
+                    <SortTh label="Qty" column="quantity" sort={realizedSort} onSort={setRealizedSort} align="right" />
                     <SortTh label="Buy price" column="buyAvg" sort={realizedSort} onSort={setRealizedSort} align="right" />
                     <SortTh label="Sell price" column="sellAvg" sort={realizedSort} onSort={setRealizedSort} align="right" />
                     <SortTh label="Buy value" column="buyValue" sort={realizedSort} onSort={setRealizedSort} align="right" />
                     <SortTh label="Sell value" column="sellValue" sort={realizedSort} onSort={setRealizedSort} align="right" />
                     <SortTh label="Realized" column="realized" sort={realizedSort} onSort={setRealizedSort} align="right" />
-                    <th className="px-4 py-3" />
+                    <SortTh label="Risk" column="riskAmount" sort={realizedSort} onSort={setRealizedSort} align="right" />
+                    <SortTh label="R:R" column="riskReward" sort={realizedSort} onSort={setRealizedSort} align="right" />
+                    <SortTh label="On cap" column="onCapital" sort={realizedSort} onSort={setRealizedSort} align="right" />
+                    <th className="px-3 py-3 font-medium">Journal</th>
+                    {editRows ? <th className="px-4 py-3" /> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {ranked.map((row) => {
-                    const editing = editingId === row.id;
-                    const hold = holdingDays(editing ? { buyDate: editBuy, sellDate: editSell } : row);
+                    const editing = editRows && editingId === row.id;
+                    const hold = holdingDays(
+                      editing
+                        ? {
+                            buyDate: toIsoDate(editBuy),
+                            sellDate: toIsoDate(editSell),
+                            side: editSide,
+                            openQtyType: editSide === "short" ? "Short" : "Long",
+                            openQty: editSide === "short" ? -1 : 1,
+                          }
+                        : row,
+                    );
+                    const liveQty =
+                      editing && editQty !== "" && Number(editQty) > 0 ? Number(editQty) : row.quantity;
+                    const liveBuyPx = editing && editBuyPx !== "" ? Number(editBuyPx) : buyAvg(row);
+                    const liveSellPx = editing && editSellPx !== "" ? Number(editSellPx) : sellAvg(row);
                     const liveBuy =
-                      editing && editBuyPx !== "" && row.quantity
-                        ? Number(editBuyPx) * row.quantity
+                      editing && liveQty && liveBuyPx
+                        ? liveBuyPx * liveQty
                         : row.buyValue;
                     const liveSell =
-                      editing && editSellPx !== "" && row.quantity
-                        ? Number(editSellPx) * row.quantity
+                      editing && liveQty && liveSellPx
+                        ? liveSellPx * liveQty
                         : row.sellValue;
                     const liveRealized = Number.isFinite(liveBuy) && Number.isFinite(liveSell)
                       ? liveSell - liveBuy
                       : row.realizedPnl;
+                    const liveRisk =
+                      editing && editRisk !== "" ? Number(editRisk) : row.riskAmount;
+                    const liveRr = riskRewardRatio(
+                      liveRealized,
+                      Number.isFinite(liveRisk) ? liveRisk : 0,
+                    );
                     return (
-                      <tr key={row.id} className="border-b border-slate-100 last:border-0">
+                      <Fragment key={row.id}>
+                      <tr className="border-b border-border/50 last:border-0">
                         <td className="px-4 py-2 font-mono tracking-wide">{row.symbol}</td>
                         <td className="px-3 py-2">
                           {editing ? (
+                            <select
+                              className="h-8 rounded-lg border border-border bg-card px-2 font-mono text-xs"
+                              value={editSide}
+                              onChange={(e) => setEditSide(e.target.value as BookSide)}
+                              aria-label={`${row.symbol} side`}
+                            >
+                              <option value="long">Long</option>
+                              <option value="short">Short</option>
+                            </select>
+                          ) : (
+                            <span className="font-mono text-xs tracking-wide uppercase">
+                              {inferBookSide(row)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {editing ? (
                             <input
-                              type="date"
-                              className="h-8 rounded-lg border border-slate-200 bg-white px-2 font-mono text-xs"
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="dd-mm-yyyy"
+                              className="h-8 w-[7.5rem] rounded-lg border border-border bg-card px-2 font-mono text-xs"
                               value={editBuy}
                               onChange={(e) => setEditBuy(e.target.value)}
                               aria-label={`${row.symbol} buy date`}
                             />
                           ) : (
-                            <span className="font-mono tabular-nums text-slate-700">
+                            <span className="font-mono tabular-nums text-foreground/80">
                               {formatDate(row.buyDate)}
                             </span>
                           )}
@@ -761,19 +1207,21 @@ export function PortfolioBlotter() {
                         <td className="px-3 py-2">
                           {editing ? (
                             <input
-                              type="date"
-                              className="h-8 rounded-lg border border-slate-200 bg-white px-2 font-mono text-xs"
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="dd-mm-yyyy"
+                              className="h-8 w-[7.5rem] rounded-lg border border-border bg-card px-2 font-mono text-xs"
                               value={editSell}
                               onChange={(e) => setEditSell(e.target.value)}
                               aria-label={`${row.symbol} sell date`}
                             />
                           ) : (
-                            <span className="font-mono tabular-nums text-slate-700">
+                            <span className="font-mono tabular-nums text-foreground/80">
                               {formatDate(row.sellDate)}
                             </span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-600">
+                        <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
                           {hold == null ? "—" : `${hold}d`}
                         </td>
                         <td className="px-3 py-2 text-right">
@@ -782,13 +1230,28 @@ export function PortfolioBlotter() {
                               type="number"
                               min="0"
                               step="any"
-                              className="h-8 w-24 rounded-lg border border-slate-200 bg-white px-2 text-right font-mono text-xs"
+                              className="h-8 w-20 rounded-lg border border-border bg-card px-2 text-right font-mono text-xs"
+                              value={editQty}
+                              onChange={(e) => setEditQty(e.target.value)}
+                              aria-label={`${row.symbol} quantity`}
+                            />
+                          ) : (
+                            <span className="font-mono tabular-nums">{formatNum(row.quantity)}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {editing ? (
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              className="h-8 w-24 rounded-lg border border-border bg-card px-2 text-right font-mono text-xs"
                               value={editBuyPx}
                               onChange={(e) => setEditBuyPx(e.target.value)}
                               aria-label={`${row.symbol} buy price`}
                             />
                           ) : (
-                            <span className="font-mono tabular-nums text-slate-700">
+                            <span className="font-mono tabular-nums text-foreground/80">
                               {buyAvg(row) ? money(buyAvg(row)) : "—"}
                             </span>
                           )}
@@ -799,13 +1262,13 @@ export function PortfolioBlotter() {
                               type="number"
                               min="0"
                               step="any"
-                              className="h-8 w-24 rounded-lg border border-slate-200 bg-white px-2 text-right font-mono text-xs"
+                              className="h-8 w-24 rounded-lg border border-border bg-card px-2 text-right font-mono text-xs"
                               value={editSellPx}
                               onChange={(e) => setEditSellPx(e.target.value)}
                               aria-label={`${row.symbol} sell price`}
                             />
                           ) : (
-                            <span className="font-mono tabular-nums text-slate-700">
+                            <span className="font-mono tabular-nums text-foreground/80">
                               {sellAvg(row) ? money(sellAvg(row)) : "—"}
                             </span>
                           )}
@@ -819,6 +1282,50 @@ export function PortfolioBlotter() {
                         <td className={`px-3 py-2 text-right font-mono tabular-nums ${pnlClass(liveRealized)}`}>
                           {money(liveRealized)}
                         </td>
+                        <td className="px-3 py-2 text-right">
+                          {editing ? (
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              className="h-8 w-24 rounded-lg border border-border bg-card px-2 text-right font-mono text-xs"
+                              value={editRisk}
+                              onChange={(e) => setEditRisk(e.target.value)}
+                              aria-label={`${row.symbol} risk amount`}
+                            />
+                          ) : (
+                            <span className="font-mono tabular-nums text-foreground/80">
+                              {row.riskAmount > 0 ? money(row.riskAmount) : "—"}
+                            </span>
+                          )}
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right font-mono tabular-nums ${
+                            liveRr == null ? "text-muted-foreground" : pnlClass(liveRr)
+                          }`}
+                        >
+                          {liveRr == null ? "—" : formatRr(liveRr)}
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right font-mono tabular-nums ${
+                            viewCapital > 0 ? pnlClass(liveRealized) : "text-muted-foreground"
+                          }`}
+                        >
+                          {viewCapital > 0 ? formatPct(liveRealized / viewCapital) : "—"}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Button
+                            type="button"
+                            variant={row.notes || journalId === row.id ? "default" : "outline"}
+                            size="xs"
+                            onClick={() =>
+                              journalId === row.id ? setJournalId(null) : openJournal(row)
+                            }
+                          >
+                            {journalId === row.id ? "Close" : row.notes ? "Journal" : "Add"}
+                          </Button>
+                        </td>
+                        {editRows ? (
                         <td className="px-4 py-2 text-right">
                           {editing ? (
                             <div className="flex justify-end gap-1">
@@ -835,7 +1342,47 @@ export function PortfolioBlotter() {
                             </Button>
                           )}
                         </td>
+                        ) : null}
                       </tr>
+                      {journalId === row.id ? (
+                        <tr className="border-b border-border/50 bg-card/80">
+                          <td colSpan={editRows ? 16 : 15} className="px-4 py-3">
+                            <p className="text-muted-foreground mb-2 text-[10px] tracking-[0.18em] uppercase">
+                              Journal · {row.symbol}
+                              {bookView === "all" ? ` · ${accountLabel(row.account)}` : ""}
+                            </p>
+                            <textarea
+                              value={journalText}
+                              onChange={(e) => setJournalText(e.target.value)}
+                              rows={4}
+                              maxLength={4000}
+                              placeholder="Trade journal: thesis, what you saw, what would kill the read, what you learned."
+                              className="border-input bg-background text-foreground mb-2 w-full rounded-lg border px-3 py-2 text-sm leading-relaxed"
+                              aria-label={`${row.symbol} journal`}
+                            />
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button type="button" size="xs" onClick={saveJournal}>
+                                Save journal
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="xs"
+                                onClick={() => {
+                                  setJournalId(null);
+                                  setJournalText("");
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                              <span className="text-muted-foreground text-xs">
+                                Then Save the book in the header so it writes to disk.
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -900,10 +1447,10 @@ export function PortfolioBlotter() {
             )}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl bg-white text-slate-900">
+          <div className="overflow-x-auto rounded-xl bg-card text-foreground">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-[10px] tracking-[0.18em] text-slate-500 uppercase">
+                <tr className="border-b border-border text-left text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
                   <th className="px-4 py-3 font-medium">
                     <input
                       type="checkbox"
@@ -940,7 +1487,7 @@ export function PortfolioBlotter() {
                   const on = selectedSet.has(row.id);
                   const rpct = row.realizedPnlPct > 1 ? row.realizedPnlPct / 100 : row.realizedPnlPct;
                   return (
-                    <tr key={row.id} className="border-b border-slate-100 last:border-0">
+                    <tr key={row.id} className="border-b border-border/50 last:border-0">
                       <td className="px-4 py-3">
                         <input
                           type="checkbox"
@@ -958,7 +1505,7 @@ export function PortfolioBlotter() {
                       </td>
                       <td className="px-3 py-3 font-mono tabular-nums">{formatDate(row.buyDate)}</td>
                       <td className="px-3 py-3 font-mono tabular-nums">{formatDate(row.sellDate)}</td>
-                      <td className="px-3 py-3 font-mono text-xs text-slate-500">{row.isin || "—"}</td>
+                      <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{row.isin || "—"}</td>
                       <td className="px-3 py-3 text-right font-mono tabular-nums">{formatNum(row.quantity)}</td>
                       <td className="px-3 py-3 text-right font-mono tabular-nums">{money(row.buyValue)}</td>
                       <td className="px-3 py-3 text-right font-mono tabular-nums">
@@ -998,7 +1545,7 @@ export function PortfolioBlotter() {
         </h2>
         <form
           onSubmit={onSubmit}
-          className="grid gap-4 rounded-xl bg-white p-4 text-slate-900 md:grid-cols-4 lg:grid-cols-8 lg:items-end"
+          className="grid gap-4 rounded-xl bg-card p-4 text-foreground md:grid-cols-4 lg:grid-cols-8 lg:items-end"
         >
           <Field label="Date" htmlFor="pos-date">
             <Input
@@ -1121,7 +1668,7 @@ function SortTh({
     <th className={`px-3 py-3 font-medium ${align === "right" ? "text-right" : "text-left"} first:px-4`}>
       <button
         type="button"
-        className={`tracking-[0.18em] uppercase ${active ? "text-slate-800" : "text-slate-500"}`}
+        className={`tracking-[0.18em] uppercase ${active ? "text-foreground" : "text-muted-foreground"}`}
         onClick={() => onSort(toggleSort(sort, column))}
       >
         {label}
@@ -1142,10 +1689,88 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={htmlFor} className="text-slate-600">
+      <Label htmlFor={htmlFor} className="text-muted-foreground">
         {label}
       </Label>
       {children}
+    </div>
+  );
+}
+
+function formatHitRate(n: number | null) {
+  if (n == null) return "—";
+  const digits = n === 0 || n === 1 ? 0 : 2;
+  return `${(n * 100).toFixed(digits)}%`;
+}
+
+function HitRateTable({ title, rows }: { title: string; rows: HitRateBucket[] }) {
+  return (
+    <div>
+      <h3 className="text-muted-foreground mb-3 text-[10px] tracking-[0.18em] uppercase">{title}</h3>
+      <div className="overflow-x-auto rounded-xl bg-card text-foreground">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+              <th className="px-4 py-2 font-medium">Period</th>
+              <th className="px-3 py-2 text-right font-medium">Names</th>
+              <th className="px-3 py-2 text-right font-medium">Hits</th>
+              <th className="px-3 py-2 text-right font-medium">Misses</th>
+              <th className="px-3 py-2 text-right font-medium">Hit rate</th>
+              <th className="px-4 py-2 text-right font-medium">Realized</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} className="border-b border-border/50 last:border-0">
+                <td className="px-4 py-2">{row.label}</td>
+                <td className="px-3 py-2 text-right font-mono tabular-nums">{row.names}</td>
+                <td className="px-3 py-2 text-right font-mono tabular-nums text-gain">{row.hits}</td>
+                <td className="px-3 py-2 text-right font-mono tabular-nums text-loss">{row.misses}</td>
+                <td
+                  className={`px-3 py-2 text-right font-mono tabular-nums ${
+                    row.hitRate == null ? "text-muted-foreground" : pnlClass(row.hitRate - 0.5)
+                  }`}
+                >
+                  {row.hitRate == null ? "—" : formatPct(row.hitRate)}
+                </td>
+                <td className={`px-4 py-2 text-right font-mono tabular-nums ${pnlClass(row.realized)}`}>
+                  {money(row.realized)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ProfitTable({ title, rows }: { title: string; rows: ProfitBucket[] }) {
+  return (
+    <div>
+      <h3 className="text-muted-foreground mb-3 text-[10px] tracking-[0.18em] uppercase">{title}</h3>
+      <div className="overflow-x-auto rounded-xl bg-card text-foreground">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+              <th className="px-4 py-2 font-medium">Period</th>
+              <th className="px-3 py-2 text-right font-medium">Names</th>
+              <th className="px-4 py-2 text-right font-medium">Profit (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} className="border-b border-border/50 last:border-0">
+                <td className="px-4 py-2">{row.label}</td>
+                <td className="px-3 py-2 text-right font-mono tabular-nums">{row.names}</td>
+                <td className={`px-4 py-2 text-right font-mono tabular-nums ${pnlClass(row.realized)}`}>
+                  {money(row.realized)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -1162,10 +1787,10 @@ function SliceTable({
   }[];
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl bg-white text-slate-900">
+    <div className="overflow-x-auto rounded-xl bg-card text-foreground">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-200 text-left text-[10px] tracking-[0.18em] text-slate-500 uppercase">
+          <tr className="border-b border-border text-left text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
             <th className="px-4 py-2 font-medium">Book</th>
             <th className="px-3 py-2 text-right font-medium">Names</th>
             <th className="px-3 py-2 text-right font-medium">Gross</th>
@@ -1174,7 +1799,7 @@ function SliceTable({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} className="border-b border-slate-100 last:border-0">
+            <tr key={row.id} className="border-b border-border/50 last:border-0">
               <td className="px-4 py-2">{row.label}</td>
               <td className="px-3 py-2 text-right font-mono tabular-nums">{row.trades}</td>
               <td className="px-3 py-2 text-right font-mono tabular-nums">{money(row.gross)}</td>

@@ -19,7 +19,7 @@ import {
 } from "@/lib/journal/notes";
 
 const fieldClass =
-  "h-8 w-full rounded-lg border border-input bg-white px-2.5 text-sm text-slate-900";
+  "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm text-foreground";
 
 export function TimeframeJournal() {
   const [notes, setNotes] = useState<TimeFrameNote[]>([]);
@@ -184,10 +184,10 @@ export function TimeframeJournal() {
         </h2>
         <form
           onSubmit={onSubmit}
-          className="grid gap-4 rounded-xl bg-white p-4 text-slate-900 md:grid-cols-4 lg:items-end"
+          className="grid gap-4 rounded-xl bg-card p-4 text-foreground md:grid-cols-4 lg:items-end"
         >
           <div className="space-y-1.5">
-            <Label htmlFor="note-serial" className="text-slate-600">
+            <Label htmlFor="note-serial" className="text-muted-foreground">
               Serial number
             </Label>
             <Input
@@ -201,7 +201,7 @@ export function TimeframeJournal() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="note-date" className="text-slate-600">
+            <Label htmlFor="note-date" className="text-muted-foreground">
               Date
             </Label>
             <Input
@@ -214,7 +214,7 @@ export function TimeframeJournal() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="note-time" className="text-slate-600">
+            <Label htmlFor="note-time" className="text-muted-foreground">
               Time
             </Label>
             <Input
@@ -227,13 +227,13 @@ export function TimeframeJournal() {
             />
           </div>
           <div className="space-y-1.5 md:col-span-4">
-            <Label htmlFor="note-thoughts" className="text-slate-600">
+            <Label htmlFor="note-thoughts" className="text-muted-foreground">
               Thoughts
             </Label>
             <textarea
               id="note-thoughts"
               rows={5}
-              className="w-full rounded-lg border border-input bg-white px-2.5 py-2 text-sm text-slate-900 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="w-full rounded-lg border border-input bg-card px-2.5 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               placeholder="What you see…"
               value={form.thoughts}
               onChange={(e) => setForm((f) => ({ ...f, thoughts: e.target.value }))}
@@ -241,7 +241,7 @@ export function TimeframeJournal() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="note-verdict" className="text-slate-600">
+            <Label htmlFor="note-verdict" className="text-muted-foreground">
               Verdict
             </Label>
             <select
@@ -258,7 +258,7 @@ export function TimeframeJournal() {
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="note-tstat" className="text-slate-600">
+            <Label htmlFor="note-tstat" className="text-muted-foreground">
               t-stat (optional)
             </Label>
             <Input
@@ -292,21 +292,21 @@ export function TimeframeJournal() {
         ) : (
           <div className="space-y-3">
             {ordered.map((row) => (
-              <article key={row.id} className="rounded-xl bg-white p-4 text-slate-900">
+              <article key={row.id} className="rounded-xl bg-card p-4 text-foreground">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <p className="font-mono text-sm tabular-nums">
                     #{row.serial}
-                    <span className="mx-2 text-slate-400">·</span>
+                    <span className="mx-2 text-muted-foreground">·</span>
                     {formatDate(row.date)} {row.time}
                     {row.timeframe ? (
                       <>
-                        <span className="mx-2 text-slate-400">·</span>
+                        <span className="mx-2 text-muted-foreground">·</span>
                         {row.timeframe}
                       </>
                     ) : null}
                     {row.tStat != null ? (
                       <>
-                        <span className="mx-2 text-slate-400">·</span>
+                        <span className="mx-2 text-muted-foreground">·</span>
                         t {row.tStat.toFixed(2)}
                         {row.tStat > 3 ? "" : " (below 3.0)"}
                       </>
@@ -314,7 +314,7 @@ export function TimeframeJournal() {
                   </p>
                   <div className="flex items-center gap-2">
                     <select
-                      className="h-7 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800"
+                      className="h-7 rounded-md border border-border bg-card px-2 text-xs text-foreground/80"
                       value={row.verdict}
                       onChange={(e) => setVerdict(row.id, e.target.value as TrialVerdict)}
                       aria-label={`Verdict for note ${row.serial}`}
@@ -330,7 +330,7 @@ export function TimeframeJournal() {
                     </Button>
                   </div>
                 </div>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/80">
                   {row.thoughts}
                 </p>
               </article>

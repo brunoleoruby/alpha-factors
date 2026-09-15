@@ -5,12 +5,13 @@ import { formatDate, formatDateShort, formatPct, formatUsd, pnlClass } from "@/l
 
 export type NavPoint = { date: string; equity: number };
 
-function axisTick(tick: number) {
+function axisTick(tick: number, prefix = "") {
   const a = Math.abs(tick);
-  if (a >= 10_000_000) return `${(tick / 10_000_000).toFixed(1)}Cr`;
-  if (a >= 100_000) return `${(tick / 100_000).toFixed(1)}L`;
-  if (a >= 1000) return `${(tick / 1000).toFixed(0)}k`;
-  return String(Math.round(tick));
+  const sign = tick < 0 ? "−" : "";
+  if (a >= 10_000_000) return `${sign}${prefix}${(a / 10_000_000).toFixed(1)}Cr`;
+  if (a >= 100_000) return `${sign}${prefix}${(a / 100_000).toFixed(1)}L`;
+  if (a >= 1000) return `${sign}${prefix}${(a / 1000).toFixed(0)}k`;
+  return `${sign}${prefix}${Math.round(a)}`;
 }
 
 export function EquityChart({
@@ -27,6 +28,7 @@ export function EquityChart({
   ariaLabel?: string;
 }) {
   const [hover, setHover] = useState<number | null>(null);
+  const axisPrefix = money(0).includes("₹") ? "₹" : "";
 
   if (points.length < 2) {
     return (
@@ -48,7 +50,7 @@ export function EquityChart({
 
   const w = 920;
   const h = 280;
-  const padL = 58;
+  const padL = axisPrefix ? 68 : 58;
   const padR = 16;
   const padT = 16;
   const padB = 28;
@@ -71,7 +73,7 @@ export function EquityChart({
   const area = `${line} L${(padL + innerW).toFixed(2)} ${(padT + innerH).toFixed(2)} L${padL} ${(padT + innerH).toFixed(2)} Z`;
   const ticks = 4;
   const yTicks = Array.from({ length: ticks + 1 }, (_, i) => min + (span * i) / ticks);
-  const xLabels = [0, Math.floor(points.length / 2), points.length - 1].map((i) => ({
+  const xLabels = [...new Set([0, Math.floor(points.length / 2), points.length - 1])].map((i) => ({
     i,
     label: formatDateShort(points[i].date),
   }));
@@ -93,7 +95,7 @@ export function EquityChart({
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-3 text-sm">
         <p className={`font-mono ${pnlClass(active.equity)}`}>{money(active.equity)}</p>
-        <p className="font-mono text-slate-500">
+        <p className="text-muted-foreground font-mono">
           {hover == null
             ? ret == null
               ? `${points.length} marks · ${formatDateShort(points[0].date)} → ${formatDateShort(last.date)}`
@@ -101,10 +103,10 @@ export function EquityChart({
             : formatDate(active.date)}
         </p>
       </div>
-      <div className="rounded-xl bg-white p-3">
+      <div className="bg-card rounded-xl p-3">
         <svg
           viewBox={`0 0 ${w} ${h}`}
-          className="h-64 w-full cursor-crosshair bg-white md:h-72"
+          className="bg-card h-64 w-full cursor-crosshair md:h-72"
           role="img"
           aria-label={ariaLabel}
           onPointerMove={onMove}
@@ -112,44 +114,44 @@ export function EquityChart({
         >
           <defs>
             <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#1e5a9a" stopOpacity="0.18" />
-              <stop offset="100%" stopColor="#1e5a9a" stopOpacity="0" />
+              <stop offset="0%" stopColor="#c4b49a" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="#c4b49a" stopOpacity="0" />
             </linearGradient>
           </defs>
-          {yTicks.map((tick) => {
+          {yTicks.map((tick, yi) => {
             const y = xy(0, tick)[1];
             return (
-              <g key={tick}>
+              <g key={`y-${yi}`}>
                 <line
                   x1={padL}
                   x2={padL + innerW}
                   y1={y}
                   y2={y}
-                  stroke="#e2e8f0"
+                  stroke="#3a3732"
                   strokeWidth="1"
                 />
                 <text
                   x={padL - 8}
                   y={y + 4}
                   textAnchor="end"
-                  fill="#64748b"
+                  fill="#9a9288"
                   fontSize="11"
                   fontFamily="ui-monospace, monospace"
                 >
-                  {axisTick(tick)}
+                  {axisTick(tick, axisPrefix)}
                 </text>
               </g>
             );
           })}
           <path d={area} fill={`url(#${fillId})`} />
-          <path d={line} fill="none" stroke="#1e5a9a" strokeWidth="2.25" />
+          <path d={line} fill="none" stroke="#c4b49a" strokeWidth="2.25" />
           {xLabels.map(({ i, label }) => (
             <text
-              key={label + i}
+              key={`x-${i}`}
               x={xy(i, min)[0]}
               y={h - 8}
               textAnchor="middle"
-              fill="#64748b"
+              fill="#9a9288"
               fontSize="11"
               fontFamily="ui-monospace, monospace"
             >
@@ -163,23 +165,23 @@ export function EquityChart({
                 x2={hx}
                 y1={padT}
                 y2={padT + innerH}
-                stroke="#94a3b8"
+                stroke="#6b6560"
                 strokeWidth="1"
                 strokeDasharray="4 4"
               />
-              <circle cx={hx} cy={hy} r="4.5" fill="#1e5a9a" stroke="#fff" strokeWidth="2" />
+              <circle cx={hx} cy={hy} r="4.5" fill="#c4b49a" stroke="#1a1815" strokeWidth="2" />
               <rect
                 x={tipRight ? hx - 168 : hx + 10}
                 y={Math.max(padT, hy - 34)}
                 width="158"
                 height="40"
                 rx="6"
-                fill="#0f172a"
+                fill="#1a1815"
               />
               <text
                 x={tipRight ? hx - 160 : hx + 18}
                 y={Math.max(padT, hy - 34) + 16}
-                fill="#e2e8f0"
+                fill="#c8c0b4"
                 fontSize="11"
                 fontFamily="ui-monospace, monospace"
               >
@@ -188,7 +190,7 @@ export function EquityChart({
               <text
                 x={tipRight ? hx - 160 : hx + 18}
                 y={Math.max(padT, hy - 34) + 32}
-                fill="#fff"
+                fill="#f4efe6"
                 fontSize="12"
                 fontFamily="ui-monospace, monospace"
                 fontWeight="600"

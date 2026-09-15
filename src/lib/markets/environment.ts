@@ -43,8 +43,9 @@ export const ENV_COLUMNS: EnvColumn[] = [
   {
     id: "asia",
     title: "Asia indices",
-    blurb: "Overnight Asia session.",
+    blurb: "Overnight Asia session, plus GIFT Nifty for the India open.",
     rows: [
+      { id: "giftnifty", yahoo: "TV:NSEIX:NIFTY1!", name: "GIFT Nifty", short: "GIFT", digits: 2 },
       { id: "n225", yahoo: "^N225", name: "Nikkei 225", short: "NKY", digits: 2 },
       { id: "hsi", yahoo: "^HSI", name: "Hang Seng", short: "HSI", digits: 2 },
       { id: "shcomp", yahoo: "000001.SS", name: "Shanghai Composite", short: "SHCOMP", digits: 2 },
@@ -89,7 +90,9 @@ export const ENV_COLUMNS: EnvColumn[] = [
   },
 ];
 
-export const ENV_YAHOO_SYMBOLS = ENV_COLUMNS.flatMap((c) => c.rows.map((r) => r.yahoo));
+export const ENV_YAHOO_SYMBOLS = ENV_COLUMNS.flatMap((c) => c.rows.map((r) => r.yahoo)).filter(
+  (s) => !s.startsWith("TV:"),
+);
 
 export const ENV_BY_YAHOO = Object.fromEntries(
   ENV_COLUMNS.flatMap((c) => c.rows.map((r) => [r.yahoo, { column: c.id, instrument: r }])),
@@ -99,6 +102,7 @@ export type EnvQuote = {
   id: string;
   yahoo: string;
   last: number | null;
+  prevClose: number | null;
   change: number | null;
   changePct: number | null;
   error?: string;

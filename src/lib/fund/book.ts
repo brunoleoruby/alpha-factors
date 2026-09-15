@@ -10,7 +10,7 @@ export type FundPosition = {
 export type NavPoint = { date: string; equity: number };
 
 export const FUND = {
-  name: "Alpha Factors",
+  name: "Eminent Corpus",
   vehicle: "Long / Short Equity",
   asOf: "2026-09-09",
   aum: 482_000_000,

@@ -33,8 +33,8 @@ function Spark({ values }: { values: number[] }) {
     })
     .join(" ");
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="h-16 w-full bg-white" role="img" aria-label="Recent path">
-      <path d={d} fill="none" stroke="#1e5a9a" strokeWidth="2" />
+    <svg viewBox={`0 0 ${w} ${h}`} className="bg-card h-16 w-full" role="img" aria-label="Recent path">
+      <path d={d} fill="none" stroke="#c4b49a" strokeWidth="2" />
     </svg>
   );
 }
@@ -82,9 +82,9 @@ export function IndexBehaviorPopup({
         role="dialog"
         aria-modal="true"
         aria-labelledby="behavior-title"
-        className="border-border relative z-10 w-full max-w-2xl rounded-xl border bg-[#1e5a9a] shadow-2xl"
+        className="border-border bg-card relative z-10 w-full max-w-2xl rounded-xl border shadow-2xl"
       >
-        <div className="flex items-start justify-between gap-3 border-b border-white/15 px-5 py-3">
+        <div className="border-border flex items-start justify-between gap-3 border-b px-5 py-3">
           <div>
             <p className="text-primary text-[10px] tracking-[0.22em] uppercase">Algorithm · tape rhyme</p>
             <h2 id="behavior-title" className="font-heading mt-1 text-2xl font-semibold">

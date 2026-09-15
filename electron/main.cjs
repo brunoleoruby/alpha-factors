@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, shell } = require("electron");
+const { app, BrowserWindow, Menu, shell, ipcMain } = require("electron");
 const path = require("path");
 
 app.disableHardwareAcceleration();
@@ -56,6 +56,18 @@ const menu = Menu.buildFromTemplate([
     ],
   },
 ]);
+
+ipcMain.handle("desk:capture-rect", async (event, rect) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return "";
+  const image = await win.webContents.capturePage({
+    x: Math.round(rect.x),
+    y: Math.round(rect.y),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+  });
+  return image.toDataURL();
+});
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(menu);

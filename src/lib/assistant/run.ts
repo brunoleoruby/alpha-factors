@@ -13,7 +13,7 @@ export type JournalSnapshot = {
 };
 
 const DESK_MAP =
-  "Whole desk, not only sector analysis. US dashboard / · US pattern desk /desk · US Top 50 /stocks · NSE pattern desk /nse · Nifty 50 /nse/stocks · Market environment /environment · Portfolio /portfolio · Time frame /timeframe · Sector analysis /sector. Ask any of those.";
+  "Whole desk, not only sector analysis. US dashboard / · US pattern desk /desk · US Top 50 /stocks · NSE pattern desk /nse · Nifty 50 /nse/stocks · Market environment /environment · Portfolio /portfolio · Time frame /timeframe · Sector analysis /sector · IPO /ipo. Ask any of those.";
 
 function inferMarket(text: string, fallback: SectorMarket): SectorMarket {
   const q = text.toLowerCase();
@@ -51,6 +51,7 @@ function navNote(q: string) {
     return "Open NSE then the Nifty 50 pill, or US then Top 50. Those lists are under each market, not in the top bar.";
   }
   if (/sector/.test(q) && /where|open|tab/.test(q)) return "Sector analysis is in the top header. Live book is at the top of that page; Dow and 2021 history sit below.";
+  if (/\bipo\b/.test(q) && /where|open|tab/.test(q)) return "IPO is in the top header. Open, upcoming, and recent NSE issues.";
   return null;
 }
 
@@ -137,7 +138,7 @@ function journalReply(journal?: JournalSnapshot) {
   return `Time frame journal: ${journal.n} notes · ${journal.open} open · ${journal.killed} killed · ${journal.survived} survived. Open Time frame to edit. Save is explicit.`;
 }
 
-const SYSTEM = `You are the Alpha Factors 2.0 desk assistant for the whole app: US/NSE desks, Nifty 50 / Top 50, market environment, portfolio blotter, time-frame journal, and sector analysis. Answer only from the snapshot JSON. Be concise. Never invent prices or P&L. End with "Not a recommendation" when you discuss holdings.`;
+const SYSTEM = `You are the Eminent Corpus desk assistant for the whole app: US/NSE desks, Nifty 50 / Top 50, market environment, portfolio blotter, time-frame journal, sector analysis, and IPO. Answer only from the snapshot JSON. Be concise. Never invent prices or P&L. End with "Not a recommendation" when you discuss holdings.`;
 
 async function polishWithLlm(question: string, snapshot: string) {
   const key = process.env.OPENAI_API_KEY;

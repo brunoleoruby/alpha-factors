@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatPct, pnlClass } from "@/lib/format";
-import { analyzePositions, money, summaryForView } from "@/lib/portfolio/analytics";
+import { analyzePositions, money, returnOnCapital, summaryForView } from "@/lib/portfolio/analytics";
 import {
   loadPositionBook,
   parsePositionBook,
@@ -29,6 +29,7 @@ function Chip({ label, value, tone }: { label: string; value: string; tone?: num
 export function LiveBookStrip() {
   const [positions, setPositions] = useState<PositionLine[]>([]);
   const [summaries, setSummaries] = useState<AccountSummaries>({});
+  const [totalCapital, setTotalCapital] = useState(0);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -41,11 +42,13 @@ export function LiveBookStrip() {
         if (!dead) {
           setPositions(body.positions.length ? body.positions : local.positions);
           setSummaries(Object.keys(body.summaries).length ? body.summaries : local.summaries);
+          setTotalCapital(body.totalCapital || local.totalCapital);
         }
       } catch {
         if (!dead) {
           setPositions(local.positions);
           setSummaries(local.summaries);
+          setTotalCapital(local.totalCapital);
         }
       } finally {
         if (!dead) setReady(true);
@@ -61,6 +64,8 @@ export function LiveBookStrip() {
     () => analyzePositions(positions, summaryForView(summaries, "all", "all")),
     [positions, summaries],
   );
+
+  const roc = returnOnCapital(book.netPnl, totalCapital);
 
   if (!ready) return null;
 
@@ -84,11 +89,16 @@ export function LiveBookStrip() {
           Open book
         </Link>
       </p>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4 xl:grid-cols-8">
         <Chip label="Stocks" value={String(positions.length)} />
         <Chip label="Realized" value={money(book.realized)} tone={book.realized} />
         <Chip label="Charges" value={money(-book.costs)} tone={-book.costs} />
         <Chip label="Net P&L" value={money(book.netPnl)} tone={book.netPnl} />
+        <Chip
+          label="On capital"
+          value={roc == null ? "—" : formatPct(roc)}
+          tone={roc == null ? undefined : roc}
+        />
         <Chip label="Open names" value={String(book.names)} />
         <Chip label="Open gross" value={money(book.gross)} />
         <Chip

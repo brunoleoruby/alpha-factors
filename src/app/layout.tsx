@@ -21,7 +21,7 @@ const cormorant = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "Alpha Factors 2.0",
+  title: "Eminent Corpus",
   description: "Long/short equity partner dashboard.",
 };
 

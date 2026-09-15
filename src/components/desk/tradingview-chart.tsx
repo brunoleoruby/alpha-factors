@@ -80,7 +80,7 @@ function toBars(candles: Candle[], tf: TimeframeId) {
 function toMarkers(candles: Candle[], tf: TimeframeId) {
   const size = tf === "1W" || tf === "1M" ? 1.15 : 0.9;
   const points = [
-    ...threePointSwingHighs(candles).map((s) => ({ ...s, color: "#1e5a9a" })),
+    ...threePointSwingHighs(candles).map((s) => ({ ...s, color: "#c4b49a" })),
     ...threePointSwingLows(candles).map((s) => ({ ...s, color: "#3d9a78" })),
   ].sort((a, b) => a.time - b.time || (a.kind === "low" ? -1 : 1));
   return points.map((s) => ({
@@ -235,7 +235,7 @@ export function TradingViewChart({
   );
 
   return (
-    <div className={cn("overflow-hidden rounded-xl border border-primary/15 bg-white", className)}>
+    <div className={cn("border-border bg-card overflow-hidden rounded-xl border", className)}>
       <div className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-primary font-mono text-sm">
           {name ?? symbol} · {tv}
@@ -286,7 +286,7 @@ export function TradingViewChart({
       <div className={cn("relative w-full", heightClassName)}>
         <div ref={hostRef} className="absolute inset-0" />
         {error && !pending ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/90 px-4 text-center text-sm text-slate-600">
+          <div className="bg-card/90 absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-muted-foreground">
             <div>
               <p className="text-muted-foreground">{error}</p>
               <a

@@ -1,7 +1,7 @@
 import { PortfolioBlotter } from "@/components/desk/portfolio-blotter";
 
 export const metadata = {
-  title: "Portfolio · Alpha Factors",
+  title: "Portfolio · Eminent Corpus",
   description: "Enter trade data for the book.",
 };
 

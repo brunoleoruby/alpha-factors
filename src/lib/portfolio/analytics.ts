@@ -2,6 +2,8 @@ import { formatInrFine } from "@/lib/format";
 import { notionalCost } from "@/lib/research/costs";
 import {
   buyAvg,
+  entryDate,
+  exitDate,
   type AccountSummaries,
   type PnlSummary,
   type PositionLine,
@@ -489,6 +491,188 @@ export function money(n: number) {
   return formatInrFine(n);
 }
 
+export function returnOnCapital(pnl: number, capital: number) {
+  if (!(capital > 0)) return null;
+  return pnl / capital;
+}
+
+export function annualizedOnCapital(roc: number | null, from?: string, to?: string) {
+  if (roc == null || !from || !to) return null;
+  const start = Date.parse(from);
+  const end = Date.parse(to);
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null;
+  const years = (end - start) / (365.25 * 86_400_000);
+  if (!(years > 0)) return null;
+  return roc / years;
+}
+
+export type HitRateBucket = {
+  id: string;
+  label: string;
+  names: number;
+  hits: number;
+  misses: number;
+  realized: number;
+  hitRate: number | null;
+};
+
+export type HitRateBook = {
+  months: HitRateBucket[];
+  quarters: HitRateBucket[];
+  names: number;
+  dated: number;
+  hits: number;
+  misses: number;
+  hitRate: number | null;
+};
+
+const MONTH_LABEL = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function parseBookDay(value: string) {
+  const raw = value.trim();
+  if (!raw) return null;
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return { y: Number(iso[1]), m: Number(iso[2]) };
+  const dmy = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (dmy) return { y: Number(dmy[3]), m: Number(dmy[2]) };
+  const t = Date.parse(raw);
+  if (Number.isNaN(t)) return null;
+  const d = new Date(t);
+  return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 };
+}
+
+function fyQuarter(year: number, month: number) {
+  if (month >= 4) return { fy: year + 1, q: Math.floor((month - 4) / 3) + 1 };
+  return { fy: year, q: 4 };
+}
+
+function periodKeys(day: { y: number; m: number }) {
+  const monthId = `${day.y}-${String(day.m).padStart(2, "0")}`;
+  const monthLabel = `${MONTH_LABEL[day.m - 1]} ${day.y}`;
+  const fy = fyQuarter(day.y, day.m);
+  const qid = `${fy.fy}-Q${fy.q}`;
+  const startMonth = fy.q === 4 ? 1 : (fy.q - 1) * 3 + 4;
+  const endMonth = startMonth + 2;
+  const qLabel = `FY${String(fy.fy).slice(-2)} Q${fy.q} · ${MONTH_LABEL[startMonth - 1]}–${MONTH_LABEL[endMonth - 1]}`;
+  const yearId = `FY${fy.fy}`;
+  const yearLabel = `FY${String(fy.fy).slice(-2)} · Apr–Mar`;
+  return { monthId, monthLabel, qid, qLabel, yearId, yearLabel };
+}
+
+function emptyHitBucket(id: string, label: string): HitRateBucket {
+  return { id, label, names: 0, hits: 0, misses: 0, realized: 0, hitRate: null };
+}
+
+function finishHitBucket(row: HitRateBucket): HitRateBucket {
+  const scored = row.hits + row.misses;
+  return { ...row, hitRate: scored ? row.hits / scored : null };
+}
+
+function addHit(row: HitRateBucket, pnl: number) {
+  row.names += 1;
+  row.realized += pnl;
+  if (pnl > 1e-12) row.hits += 1;
+  else if (pnl < -1e-12) row.misses += 1;
+}
+
+/** Hit rate by entry date (buy for long, sell for short). Indian FY quarter (April start). */
+export function hitRateByBuyDate(rows: PositionLine[]): HitRateBook {
+  const months = new Map<string, HitRateBucket>();
+  const quarters = new Map<string, HitRateBucket>();
+  let dated = 0;
+  let hits = 0;
+  let misses = 0;
+
+  for (const row of rows) {
+    const day = parseBookDay(entryDate(row));
+    if (!day || day.m < 1 || day.m > 12) continue;
+    dated += 1;
+    if (row.realizedPnl > 1e-12) hits += 1;
+    else if (row.realizedPnl < -1e-12) misses += 1;
+
+    const { monthId, monthLabel, qid, qLabel } = periodKeys(day);
+    const month = months.get(monthId) ?? emptyHitBucket(monthId, monthLabel);
+    addHit(month, row.realizedPnl);
+    months.set(monthId, month);
+
+    const quarter = quarters.get(qid) ?? emptyHitBucket(qid, qLabel);
+    addHit(quarter, row.realizedPnl);
+    quarters.set(qid, quarter);
+  }
+
+  const scored = hits + misses;
+  return {
+    months: [...months.values()].sort((a, b) => a.id.localeCompare(b.id)).map(finishHitBucket),
+    quarters: [...quarters.values()].sort((a, b) => a.id.localeCompare(b.id)).map(finishHitBucket),
+    names: rows.length,
+    dated,
+    hits,
+    misses,
+    hitRate: scored ? hits / scored : null,
+  };
+}
+
+export type ProfitBucket = {
+  id: string;
+  label: string;
+  names: number;
+  realized: number;
+};
+
+export type ProfitBook = {
+  months: ProfitBucket[];
+  quarters: ProfitBucket[];
+  years: ProfitBucket[];
+  names: number;
+  dated: number;
+  realized: number;
+};
+
+function emptyProfitBucket(id: string, label: string): ProfitBucket {
+  return { id, label, names: 0, realized: 0 };
+}
+
+/** Realized P&L by exit date (sell for long, buy/cover for short). Indian FY quarter (April start). */
+export function profitBySellDate(rows: PositionLine[]): ProfitBook {
+  const months = new Map<string, ProfitBucket>();
+  const quarters = new Map<string, ProfitBucket>();
+  const years = new Map<string, ProfitBucket>();
+  let dated = 0;
+  let realized = 0;
+
+  for (const row of rows) {
+    const day = parseBookDay(exitDate(row));
+    if (!day || day.m < 1 || day.m > 12) continue;
+    dated += 1;
+    realized += row.realizedPnl;
+
+    const { monthId, monthLabel, qid, qLabel, yearId, yearLabel } = periodKeys(day);
+    const month = months.get(monthId) ?? emptyProfitBucket(monthId, monthLabel);
+    month.names += 1;
+    month.realized += row.realizedPnl;
+    months.set(monthId, month);
+
+    const quarter = quarters.get(qid) ?? emptyProfitBucket(qid, qLabel);
+    quarter.names += 1;
+    quarter.realized += row.realizedPnl;
+    quarters.set(qid, quarter);
+
+    const year = years.get(yearId) ?? emptyProfitBucket(yearId, yearLabel);
+    year.names += 1;
+    year.realized += row.realizedPnl;
+    years.set(yearId, year);
+  }
+
+  return {
+    months: [...months.values()].sort((a, b) => a.id.localeCompare(b.id)),
+    quarters: [...quarters.values()].sort((a, b) => a.id.localeCompare(b.id)),
+    years: [...years.values()].sort((a, b) => a.id.localeCompare(b.id)),
+    names: rows.length,
+    dated,
+    realized,
+  };
+}
+
 export type CurvePoint = { date: string; equity: number };
 
 export function portfolioCurve(rows: PositionLine[], summary: PnlSummary | null): CurvePoint[] {
@@ -501,7 +685,7 @@ export function portfolioCurve(rows: PositionLine[], summary: PnlSummary | null)
 
   let undated = 0;
   for (const row of rows) {
-    const day = row.sellDate || row.to;
+    const day = exitDate(row) || row.to;
     if (day) bump(day, row.realizedPnl);
     else undated += row.realizedPnl;
   }
@@ -521,7 +705,10 @@ export function portfolioCurve(rows: PositionLine[], summary: PnlSummary | null)
     return { date, equity: run };
   });
   if (points.length === 1) {
-    return [{ date: points[0].date, equity: 0 }, points[0]];
+    const day = points[0].date;
+    const prior = new Date(`${day}T00:00:00Z`);
+    prior.setUTCDate(prior.getUTCDate() - 1);
+    return [{ date: prior.toISOString().slice(0, 10), equity: 0 }, points[0]];
   }
   if (points[0].equity !== 0 && start && points[0].date !== start) {
     return [{ date: start, equity: 0 }, ...points];

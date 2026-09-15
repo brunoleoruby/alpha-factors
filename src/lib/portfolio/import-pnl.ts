@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import {
+  inferBookSide,
   mergeFilePositions,
   positionId,
   type PnlSummary,
@@ -212,6 +213,8 @@ function parsePnlSheet(
       skipped += 1;
       continue;
     }
+    const openQty = num(cell(line, iOpenQty));
+    const openQtyType = String(cell(line, iOpenType) ?? "").trim();
     positions.push({
       id,
       symbol,
@@ -225,14 +228,16 @@ function parsePnlSheet(
       sellValue,
       buyPrice: 0,
       sellPrice: 0,
+      riskAmount: 0,
       realizedPnl: num(cell(line, iRpnl)),
       realizedPnlPct: num(cell(line, iRpct)),
       prevClose: num(cell(line, iPrev)),
-      openQty: num(cell(line, iOpenQty)),
-      openQtyType: String(cell(line, iOpenType) ?? "").trim(),
+      openQty,
+      openQtyType,
       openValue: num(cell(line, iOpenVal)),
       unrealizedPnl: num(cell(line, iUpnl)),
       unrealizedPnlPct: num(cell(line, iUpct)),
+      side: inferBookSide({ openQtyType, openQty }),
       account,
       segment,
       source: "file",

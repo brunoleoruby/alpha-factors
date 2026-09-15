@@ -48,7 +48,7 @@ function PricePath() {
     .join(" ");
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="h-52 w-full rounded-xl bg-white" role="img" aria-label="Polycab NSE close Dec 2023 to Jan 2024">
+    <svg viewBox={`0 0 ${w} ${h}`} className="bg-card h-52 w-full rounded-xl" role="img" aria-label="Polycab NSE close Dec 2023 to Jan 2024">
       <path d={d} fill="none" stroke="#d4bf8a" strokeWidth="2.2" />
       {marks.map((m, i) => {
         const [x, y] = xy(i, m.close);
