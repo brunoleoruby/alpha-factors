@@ -2,7 +2,7 @@ import { IpoBoard } from "@/components/desk/ipo-board";
 
 export const metadata = {
   title: "IPO · Eminent Corpus",
-  description: "NSE current, upcoming, and recent IPO issues.",
+  description: "Mainboard and SME IPOs from Chittorgarh.",
 };
 
 export default function IpoPage() {

@@ -2,6 +2,7 @@ import {
   ACCOUNTS,
   SEGMENTS,
   accountLabel,
+  inferSegment,
   segmentLabel,
   type TradeAccount,
   type TradeSegment,
@@ -166,7 +167,7 @@ export function normalizePosition(raw: Record<string, unknown>): PositionLine | 
     unrealizedPnlPct: num(raw.unrealizedPnlPct),
     side,
     account: isAccount(raw.account) ? raw.account : "zerodha-tr8076",
-    segment: isSegment(raw.segment) ? raw.segment : "equity",
+    segment: isSegment(raw.segment) ? raw.segment : inferSegment(raw.segment),
     source: raw.source === "file" ? "file" : "desk",
     notes: typeof raw.notes === "string" ? raw.notes : "",
   };
@@ -258,7 +259,7 @@ function normalizeSummary(raw: Record<string, unknown>): PnlSummary | null {
   if (typeof raw.file !== "string") return null;
   return {
     account: isAccount(raw.account) ? raw.account : "zerodha-tr8076",
-    segment: isSegment(raw.segment) ? raw.segment : "equity",
+    segment: isSegment(raw.segment) ? raw.segment : inferSegment(raw.segment),
     from: typeof raw.from === "string" ? raw.from : "",
     to: typeof raw.to === "string" ? raw.to : "",
     charges: num(raw.charges),

@@ -1,8 +1,8 @@
 "use client";
 
-import { Fragment, type CSSProperties, type Ref } from "react";
-import { formatDate, formatInrFine, formatPct } from "@/lib/format";
-import type { ProfitBucket } from "@/lib/portfolio/analytics";
+import { type CSSProperties, type Ref } from "react";
+import { formatDate, formatDateShort, formatInrFine, formatPct } from "@/lib/format";
+import type { CurvePoint } from "@/lib/portfolio/analytics";
 import { PROFIT_SHARE_DISCLAIMER, type ProfitSharePayload } from "@/lib/portfolio/share-profit";
 
 const card: CSSProperties = {
@@ -54,13 +54,110 @@ function tone(n: number | null): string {
   return n > 0 ? "#7dba8c" : "#d27a6a";
 }
 
-function groups(payload: ProfitSharePayload): { title: string; rows: ProfitBucket[] }[] {
-  const fallback: ProfitBucket[] = [{ id: "-", label: "—", names: 0, realized: 0 }];
-  return [
-    { title: "Month", rows: payload.profits.months.length ? payload.profits.months : fallback },
-    { title: "Quarter", rows: payload.profits.quarters.length ? payload.profits.quarters : fallback },
-    { title: "Year", rows: payload.profits.years.length ? payload.profits.years : fallback },
-  ];
+function axisTick(tick: number) {
+  const a = Math.abs(tick);
+  const sign = tick < 0 ? "−" : "";
+  if (a >= 10_000_000) return `${sign}₹${(a / 10_000_000).toFixed(1)}Cr`;
+  if (a >= 100_000) return `${sign}₹${(a / 100_000).toFixed(1)}L`;
+  if (a >= 1000) return `${sign}₹${(a / 1000).toFixed(0)}k`;
+  return `${sign}₹${Math.round(a)}`;
+}
+
+function ShareCurve({ points }: { points: CurvePoint[] }) {
+  const w = 664;
+  const h = 200;
+  const padL = 62;
+  const padR = 10;
+  const padT = 12;
+  const padB = 26;
+  const innerW = w - padL - padR;
+  const innerH = h - padT - padB;
+
+  if (points.length < 2) {
+    return (
+      <div
+        style={{
+          height: h,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#9a9288",
+          fontSize: 13,
+          border: "1px solid #3a342e",
+          background: "#161411",
+        }}
+      >
+        No chart for this view yet.
+      </div>
+    );
+  }
+
+  const values = points.map((p) => p.equity);
+  const min = Math.min(0, ...values);
+  const max = Math.max(0, ...values);
+  const span = max - min || 1;
+  const last = points[points.length - 1];
+  const xy = (i: number, value: number) => {
+    const x = padL + (i / (points.length - 1)) * innerW;
+    const y = padT + (1 - (value - min) / span) * innerH;
+    return [x, y] as const;
+  };
+  const line = points
+    .map((p, i) => {
+      const [x, y] = xy(i, p.equity);
+      return `${i === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(" ");
+  const area = `${line} L${(padL + innerW).toFixed(2)} ${(padT + innerH).toFixed(2)} L${padL} ${(padT + innerH).toFixed(2)} Z`;
+  const yTicks = Array.from({ length: 5 }, (_, i) => min + (span * i) / 4);
+  const xLabels = [...new Set([0, Math.floor(points.length / 2), points.length - 1])].map((i) => ({
+    i,
+    label: formatDateShort(points[i].date),
+  }));
+  const zeroY = padT + (1 - (0 - min) / span) * innerH;
+  const stroke = last.equity >= 0 ? "#7dba8c" : "#d27a6a";
+
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Total portfolio net P&L">
+      <defs>
+        <linearGradient id="shareCurveFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={stroke} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={stroke} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <rect width={w} height={h} fill="#161411" />
+      {yTicks.map((tick) => {
+        const y = padT + (1 - (tick - min) / span) * innerH;
+        return (
+          <g key={tick}>
+            <line x1={padL} x2={padL + innerW} y1={y} y2={y} stroke="#3a342e" />
+            <text x={padL - 8} y={y + 4} textAnchor="end" fill="#9a9288" fontSize="10" fontFamily="Arial, Helvetica, sans-serif">
+              {axisTick(tick)}
+            </text>
+          </g>
+        );
+      })}
+      <line x1={padL} x2={padL + innerW} y1={zeroY} y2={zeroY} stroke="#5a534c" strokeDasharray="4 4" />
+      <path d={area} fill="url(#shareCurveFill)" />
+      <path d={line} fill="none" stroke={stroke} strokeWidth="2" />
+      {xLabels.map((item) => {
+        const [x] = xy(item.i, points[item.i].equity);
+        return (
+          <text
+            key={item.i}
+            x={x}
+            y={h - 8}
+            textAnchor={item.i === 0 ? "start" : item.i === points.length - 1 ? "end" : "middle"}
+            fill="#9a9288"
+            fontSize="10"
+            fontFamily="Arial, Helvetica, sans-serif"
+          >
+            {item.label}
+          </text>
+        );
+      })}
+    </svg>
+  );
 }
 
 export function ProfitShareCard({
@@ -74,16 +171,32 @@ export function ProfitShareCard({
     payload.from && payload.to
       ? `${formatDate(payload.from)} → ${formatDate(payload.to)}`
       : "This view";
-  const hitSample =
-    payload.hitDated > 0
-      ? `${payload.hits} hit / ${payload.misses} miss · ${payload.hitDated} names`
-      : "No entry dates";
 
   const stats: { label: string; value: string; color: string }[] = [
     {
-      label: "Capital",
+      label: "Total capital",
       value: payload.capital > 0 ? formatInrFine(payload.capital) : "—",
       color: "#f4efe6",
+    },
+    {
+      label: "Realized P&L",
+      value: formatInrFine(payload.realized),
+      color: tone(payload.realized),
+    },
+    {
+      label: "Return on capital",
+      value: payload.rocBeforeCharges == null ? "—" : formatPct(payload.rocBeforeCharges),
+      color: tone(payload.rocBeforeCharges),
+    },
+    {
+      label: "Charges",
+      value: formatInrFine(-payload.charges),
+      color: tone(-payload.charges),
+    },
+    {
+      label: "Other C/D",
+      value: formatInrFine(payload.otherCD),
+      color: tone(payload.otherCD),
     },
     {
       label: "Net P&L",
@@ -91,39 +204,56 @@ export function ProfitShareCard({
       color: tone(payload.netPnl),
     },
     {
-      label: "Return",
+      label: "Net return on capital",
+      value: payload.roc == null ? "—" : formatPct(payload.roc),
+      color: tone(payload.roc),
+    },
+  ];
+
+  const vs: { label: string; value: string; color: string }[] = [
+    {
+      label: "Book",
       value: payload.roc == null ? "—" : formatPct(payload.roc),
       color: tone(payload.roc),
     },
     {
-      label: "Annualized",
-      value: payload.annualized == null ? "—" : formatPct(payload.annualized),
-      color: tone(payload.annualized),
+      label: "Nifty 50",
+      value: payload.nifty50 == null ? "—" : formatPct(payload.nifty50),
+      color: tone(payload.nifty50),
     },
     {
-      label: "Hit ratio",
-      value: payload.hitRate == null ? "—" : formatPct(payload.hitRate),
-      color: "#f4efe6",
+      label: "Vs Nifty 50",
+      value:
+        payload.roc == null || payload.nifty50 == null ? "—" : formatPct(payload.roc - payload.nifty50),
+      color: tone(payload.roc == null || payload.nifty50 == null ? null : payload.roc - payload.nifty50),
     },
     {
-      label: "Hits",
-      value: hitSample,
-      color: "#9a9288",
+      label: "Smallcap 100",
+      value: payload.smallcap == null ? "—" : formatPct(payload.smallcap),
+      color: tone(payload.smallcap),
+    },
+    {
+      label: "Vs Smallcap 100",
+      value:
+        payload.roc == null || payload.smallcap == null
+          ? "—"
+          : formatPct(payload.roc - payload.smallcap),
+      color: tone(
+        payload.roc == null || payload.smallcap == null ? null : payload.roc - payload.smallcap,
+      ),
     },
   ];
 
   return (
-    <div ref={cardRef} data-profit-share-card="v4-stats" style={card}>
-      <div style={{ fontFamily: "Georgia, Times New Roman, serif", fontSize: 28, fontWeight: 600 }}>
-        Eminent Corpus
-      </div>
+    <div ref={cardRef} data-profit-share-card="v5-performance" style={card}>
+      <img src="/brand/eminent-corpus-logo.png" width={160} height={82} alt="" />
       <div style={{ marginTop: 8, color: "#9a9288", fontSize: 14 }}>{payload.bookLabel}</div>
       <div style={{ marginTop: 4, marginBottom: 18, color: "#9a9288", fontSize: 14 }}>{period}</div>
 
-      <table style={{ ...tableStyle, marginBottom: 20 }}>
+      <table style={{ ...tableStyle, marginBottom: 16 }}>
         <colgroup>
-          <col style={{ width: "32%" }} />
-          <col style={{ width: "68%" }} />
+          <col style={{ width: "42%" }} />
+          <col style={{ width: "58%" }} />
         </colgroup>
         <tbody>
           {stats.map((row) => (
@@ -145,55 +275,61 @@ export function ProfitShareCard({
         </tbody>
       </table>
 
-      <table style={tableStyle}>
+      <div
+        style={{
+          marginBottom: 8,
+          color: "#9a9288",
+          fontSize: 11,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+        }}
+      >
+        Vs Nifty 50 · Smallcap 100
+      </div>
+      <table style={{ ...tableStyle, marginBottom: 16 }}>
         <colgroup>
-          <col style={{ width: "38%" }} />
           <col style={{ width: "42%" }} />
-          <col style={{ width: "20%" }} />
+          <col style={{ width: "58%" }} />
         </colgroup>
         <thead>
           <tr>
-            <th style={{ ...th, textAlign: "left" }}>Period</th>
-            <th style={{ ...th, textAlign: "right" }}>P&L</th>
-            <th style={{ ...th, textAlign: "right" }}>Names</th>
+            <th style={{ ...th, textAlign: "left" }}>Index</th>
+            <th style={{ ...th, textAlign: "right" }}>Return</th>
           </tr>
         </thead>
         <tbody>
-          {groups(payload).map((group) => (
-            <Fragment key={group.title}>
-              <tr>
-                <td colSpan={3} style={{ ...td, background: "#161411", color: "#9a9288", fontSize: 12, letterSpacing: "0.14em" }}>
-                  {group.title.toUpperCase()}
-                </td>
-              </tr>
-              {group.rows.map((row) => {
-                const blank = row.id === "-";
-                const pnl = blank ? "—" : formatInrFine(row.realized);
-                const color = blank ? "#9a9288" : row.realized >= 0 ? "#7dba8c" : "#d27a6a";
-                return (
-                  <tr key={`${group.title}-${row.id}`}>
-                    <td style={{ ...td, textAlign: "left" }}>{row.label}</td>
-                    <td
-                      style={{
-                        ...td,
-                        textAlign: "right",
-                        fontFamily: "Courier New, Courier, monospace",
-                        fontWeight: 600,
-                        color,
-                      }}
-                    >
-                      {pnl}
-                    </td>
-                    <td style={{ ...td, textAlign: "right", color: "#9a9288" }}>
-                      {blank ? "—" : row.names}
-                    </td>
-                  </tr>
-                );
-              })}
-            </Fragment>
+          {vs.map((row) => (
+            <tr key={row.label}>
+              <td style={metricLabel}>{row.label}</td>
+              <td
+                style={{
+                  ...td,
+                  textAlign: "right",
+                  fontFamily: "Courier New, Courier, monospace",
+                  fontWeight: 600,
+                  color: row.color,
+                }}
+              >
+                {row.value}
+              </td>
+            </tr>
           ))}
         </tbody>
       </table>
+
+      <div
+        style={{
+          marginBottom: 8,
+          color: "#9a9288",
+          fontSize: 11,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+        }}
+      >
+        Total portfolio
+      </div>
+      <ShareCurve points={payload.curve} />
+
       <div
         style={{
           marginTop: 20,

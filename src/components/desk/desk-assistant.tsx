@@ -33,7 +33,7 @@ export function DeskAssistant() {
     {
       role: "assistant",
       content:
-        "Desk assistant for the whole app — US/NSE, Nifty 50, environment, portfolio, time frame, sector analysis, and IPO. Ask any desk.",
+        "Desk assistant for the whole app — US/NSE, Nifty 50, environment, portfolio, time frame, sector analysis, IPO, and Algorithm. Ask any desk.",
     },
   ]);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -79,14 +79,14 @@ export function DeskAssistant() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "ml-auto rounded-md px-3 py-1 text-sm",
+          "rounded-md px-3 py-1 text-sm",
           open ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent",
         )}
       >
         Desk
       </button>
       {open ? (
-        <div className="border-border fixed top-[52px] right-0 z-40 flex h-[min(640px,calc(100vh-52px))] w-full max-w-md flex-col border-l bg-[#0b1f33] shadow-none">
+        <div className="border-border bg-card fixed top-[52px] right-0 z-40 flex h-[min(640px,calc(100vh-52px))] w-full max-w-md flex-col border-l shadow-none">
           <div className="border-border flex items-center justify-between border-b px-4 py-3">
             <div>
               <p className="font-heading text-sm">Desk assistant</p>

@@ -10,6 +10,7 @@ import {
   VERDICTS,
   emptyNoteForm,
   loadNotes,
+  mergeNotes,
   nextSerial,
   parseNoteList,
   saveNotes,
@@ -40,14 +41,14 @@ export function TimeframeJournal() {
         if (!res.ok) throw new Error(body.error ?? "Load failed");
         const parsedDisk = parseNoteList(body.notes);
         if (dead) return;
-        const book = parsedDisk.length ? parsedDisk : local;
+        const book = mergeNotes(parsedDisk, local);
         setNotes(book);
         saveNotes(book);
-        if (!parsedDisk.length && local.length) {
+        if (book.length > parsedDisk.length) {
           await fetch("/api/timeframe/notes", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ notes: local }),
+            body: JSON.stringify({ notes: book }),
           });
         }
         setForm(emptyNoteForm(nextSerial(book)));
@@ -67,15 +68,15 @@ export function TimeframeJournal() {
     };
   }, []);
 
-  const persistJournal = useCallback(async () => {
+  const persistJournal = useCallback(async (next = notes) => {
     setSaveBusy(true);
     setError(null);
-    saveNotes(notes);
+    saveNotes(next);
     try {
       const res = await fetch("/api/timeframe/notes", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify({ notes: next }),
       });
       if (!res.ok) throw new Error("Save failed");
       setPersist("disk");
@@ -117,6 +118,7 @@ export function TimeframeJournal() {
     setForm(emptyNoteForm(nextSerial(next)));
     setError(null);
     setDirty(true);
+    void persistJournal(next);
   }
 
   function removeNote(id: string) {
@@ -124,11 +126,14 @@ export function TimeframeJournal() {
     setNotes(next);
     setForm((f) => ({ ...f, serial: nextSerial(next) }));
     setDirty(true);
+    void persistJournal(next);
   }
 
   function setVerdict(id: string, verdict: TrialVerdict) {
-    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, verdict } : n)));
+    const next = notes.map((n) => (n.id === id ? { ...n, verdict } : n));
+    setNotes(next);
     setDirty(true);
+    void persistJournal(next);
   }
 
   const ordered = [...notes].sort((a, b) => b.serial - a.serial);
@@ -143,8 +148,7 @@ export function TimeframeJournal() {
         </h1>
         <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-relaxed">
           Log thoughts against a serial number, date, and clock time. Every row is a trial — killed or
-          survived — so the denominator is never missing. Click Save in the top bar after you add or
-          edit notes. Saved to{" "}
+          survived — so the denominator is never missing. Adding a note saves at once to{" "}
           <span className="font-mono text-foreground/80">data/timeframe-notes.json</span>.
           {persist === "disk"
             ? " Saved on disk."

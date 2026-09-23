@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "cn";
+import { FeedSource } from "@/components/desk/feed-source";
 import { formatPct, pnlClass } from "@/lib/format";
 import type { SectorMarket } from "@/lib/markets/sector-returns";
 import type { VixRegime } from "@/lib/markets/sector-signals";
@@ -70,9 +71,12 @@ export function SectorLiveBook({ market }: { market: SectorMarket }) {
 
   return (
     <section>
-      <h2 className="text-muted-foreground mb-5 text-[11px] font-medium tracking-[0.24em] uppercase">
-        Required book · 6-month momentum
-      </h2>
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.24em] uppercase">
+          Required book · 6-month momentum
+        </h2>
+        <FeedSource>Yahoo</FeedSource>
+      </div>
       {loading ? (
         <p className="text-muted-foreground text-sm">Pulling live sector paths…</p>
       ) : error ? (

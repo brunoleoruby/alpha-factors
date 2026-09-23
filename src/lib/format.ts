@@ -39,6 +39,10 @@ export function formatInrCrore(crore: number) {
   return `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(crore)} cr`;
 }
 
+export function formatInrLakhCrore(inr: number) {
+  return `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(inr / 1e12)} lakh cr`;
+}
+
 export function formatUsdCompact(n: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",

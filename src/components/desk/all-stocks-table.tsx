@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FeedSource } from "@/components/desk/feed-source";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -111,6 +112,9 @@ export function AllStocksTable({
         <CardTitle className="font-heading text-2xl">
           {title ?? (locale === "NSE" ? "NSE all stocks" : "US all stocks")}
         </CardTitle>
+        <CardAction>
+          <FeedSource>Desk book · TradingView</FeedSource>
+        </CardAction>
         <CardDescription>
           {listings.length} names. Open any row for the TradingView chart. Desk reference prices are
           simulated; the chart is live market data from TradingView.

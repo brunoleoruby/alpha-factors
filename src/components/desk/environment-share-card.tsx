@@ -120,9 +120,7 @@ function CardHead({
 }) {
   return (
     <>
-      <div style={{ fontFamily: "Georgia, Times New Roman, serif", fontSize: 28, fontWeight: 600 }}>
-        Eminent Corpus
-      </div>
+      <img src="/brand/eminent-corpus-logo.png" width={160} height={82} alt="" />
       <div style={{ marginTop: 8, color: "#9a9288", fontSize: 13, letterSpacing: "0.12em", textTransform: "uppercase" }}>
         Pre-market
       </div>

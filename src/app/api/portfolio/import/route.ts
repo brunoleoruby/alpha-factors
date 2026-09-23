@@ -79,9 +79,8 @@ async function newestImport() {
       }),
     );
     ranked.sort((a, b) => {
-      const aPnl = /\bpnl\b/i.test(a.name) ? 1 : 0;
-      const bPnl = /\bpnl\b/i.test(b.name) ? 1 : 0;
-      if (aPnl !== bPnl) return bPnl - aPnl;
+      const score = (n: string) => (/\bpnl\b/i.test(n) || /(^|[_\-\s])pl([_\-\s.]|$)/i.test(n) ? 1 : 0);
+      if (score(a.name) !== score(b.name)) return score(b.name) - score(a.name);
       return b.mtime - a.mtime;
     });
     return ranked[0];

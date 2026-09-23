@@ -11,7 +11,9 @@ import {
   type DowPrimary,
   type DowStance,
 } from "@/lib/markets/dow-theory";
+import { FeedSource } from "@/components/desk/feed-source";
 import { SectorLiveBook } from "@/components/desk/sector-live-book";
+import { SectorIndiaMcap } from "@/components/desk/sector-india-mcap";
 import {
   SECTOR_AS_OF,
   SECTOR_START,
@@ -24,6 +26,7 @@ import {
 
 type SortKey = "sector" | "cumulative" | "cagr" | number;
 type SortState = { key: SortKey; dir: "asc" | "desc" };
+type SectorTab = "performance" | "sectors";
 
 function heat(n: number) {
   const mag = Math.min(1, Math.abs(n) / 0.55);
@@ -81,6 +84,7 @@ function phaseLabel(phase: DowPhase) {
 }
 
 export function SectorAnalysis() {
+  const [tab, setTab] = useState<SectorTab>("performance");
   const [market, setMarket] = useState<SectorMarket>("NSE");
   const [sort, setSort] = useState<SortState>({ key: "cumulative", dir: "desc" });
   const rows = useMemo(() => sectorsFor(market), [market]);
@@ -122,14 +126,19 @@ export function SectorAnalysis() {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="font-heading text-4xl font-semibold tracking-tight md:text-5xl">
-              Who paid from 2021
+              {tab === "performance" ? "Who paid from 2021" : "Sectors"}
             </h1>
             <p className="text-muted-foreground mt-3 max-w-xl text-sm leading-relaxed">
-              Live book uses 6-month skip-month momentum, a 12-month index gate, and a VIX
-              overlay. History below is total return from {SECTOR_START} to {SECTOR_AS_OF}.
+              {tab === "performance"
+                ? `Live book uses 6-month skip-month momentum, a 12-month index gate, and a VIX overlay. History below is total return from ${SECTOR_START} to ${SECTOR_AS_OF}.`
+                : market === "NSE"
+                  ? "NSE Indices classifies a name by the business that earns more than half of revenue. Defence, Jewellery, Mining, and Sugar are split first, then the rest of the book."
+                  : "SPDR / GICS names in this book. Proxy is the ETF used for the tape."}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col items-start gap-2 md:items-end">
+            <FeedSource>{market === "US" ? "Yahoo · SPDR" : "Yahoo · Nifty"}</FeedSource>
+            <div className="flex gap-2">
             {(["US", "NSE"] as const).map((id) => (
               <button
                 key={id}
@@ -145,12 +154,40 @@ export function SectorAnalysis() {
                 {id}
               </button>
             ))}
+            </div>
           </div>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setTab("performance")}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs tracking-wide uppercase",
+              tab === "performance"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-primary/25 text-muted-foreground hover:border-primary/50",
+            )}
+          >
+            Performance
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("sectors")}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs tracking-wide uppercase",
+              tab === "sectors"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-primary/25 text-muted-foreground hover:border-primary/50",
+            )}
+          >
+            Sectors
+          </button>
         </div>
       </header>
 
-      <SectorLiveBook market={market} />
+      {tab === "performance" ? <SectorLiveBook market={market} /> : null}
 
+      {tab === "performance" ? (
       <section className="border-border grid gap-6 border-y py-8 md:grid-cols-3">
         <div>
           <p className="text-muted-foreground text-[10px] tracking-[0.22em] uppercase">Best since 2021</p>
@@ -178,107 +215,10 @@ export function SectorAnalysis() {
           <p className="text-muted-foreground mt-1 text-xs">Largest single-year print in this book</p>
         </div>
       </section>
+      ) : null}
 
-      <section>
-        <h2 className="text-muted-foreground mb-5 text-[11px] font-medium tracking-[0.24em] uppercase">
-          Dow Theory
-        </h2>
-        <div className="border-border mb-8 grid gap-6 border-y py-8 md:grid-cols-3">
-          <div className="md:col-span-2">
-            <p className="text-muted-foreground text-[10px] tracking-[0.22em] uppercase">Market reading</p>
-            <p className="mt-2 font-heading text-2xl">{dow.regime}</p>
-            <p className="text-muted-foreground mt-2 max-w-xl text-sm leading-relaxed">{dow.regimeNote}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-[10px] tracking-[0.22em] uppercase">Breadth (volume analog)</p>
-            <p className="mt-2 font-mono text-lg tabular-nums">
-              {dow.bullCount} bull · {dow.bearCount} bear · {dow.mixedCount} open
-            </p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              {formatPct(dow.breadth)} of sectors in a primary bull
-            </p>
-          </div>
-        </div>
-
-        <div className="mb-8 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {DOW_TENETS.map((tenet) => (
-            <div key={tenet.title} className="border-border/60 rounded-lg border px-3 py-3">
-              <p className="text-sm">{tenet.title}</p>
-              <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{tenet.body}</p>
-            </div>
-          ))}
-        </div>
-
-        <h3 className="text-muted-foreground mb-4 text-[11px] font-medium tracking-[0.24em] uppercase">
-          Averages must confirm
-        </h3>
-        <div className="mb-8 grid gap-3 md:grid-cols-2">
-          {dow.pairs.map((pair) => (
-            <div key={pair.label} className="border-border/60 rounded-lg border px-4 py-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="text-sm">
-                  {pair.a} · {pair.b}
-                </p>
-                <p className={cn("text-xs tracking-wide uppercase", pair.confirmed ? "text-gain" : "text-loss")}>
-                  {pair.confirmed ? "Confirmed" : "Divergent"}
-                </p>
-              </div>
-              <p className="text-muted-foreground mt-1 text-xs">{pair.label}</p>
-              <p className="mt-2 text-xs leading-relaxed">{pair.reading}</p>
-              <p className="text-muted-foreground mt-2 font-mono text-[10px]">
-                {pair.a}: {pair.aPrimary} · {pair.b}: {pair.bPrimary}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <h3 className="text-muted-foreground mb-4 text-[11px] font-medium tracking-[0.24em] uppercase">
-          Primary trend by sector
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="w-max min-w-full text-sm">
-            <thead>
-              <tr className="text-muted-foreground border-border border-b text-left text-[10px] tracking-[0.18em] uppercase">
-                <th className="pb-3 pr-4 font-medium">Sector</th>
-                <th className="pb-3 pr-4 font-medium">Path</th>
-                <th className="pb-3 pr-4 font-medium">Structure</th>
-                <th className="pb-3 pr-4 font-medium">Primary</th>
-                <th className="pb-3 pr-4 font-medium">Phase</th>
-                <th className="pb-3 pr-4 font-medium">Stance</th>
-                <th className="pb-3 font-medium">Note</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dow.sectors.map((row) => (
-                <tr key={row.sector} className="border-border/60 border-b last:border-0 align-top">
-                  <td className="py-3 pr-4">
-                    <div>{row.sector}</div>
-                    <div className="text-muted-foreground font-mono text-[10px]">{row.proxy}</div>
-                  </td>
-                  <td className="py-3 pr-4">
-                    <DowSpark path={row.path} />
-                  </td>
-                  <td className="py-3 pr-4 font-mono text-xs whitespace-nowrap">{row.structure}</td>
-                  <td className={cn("py-3 pr-4 whitespace-nowrap", primaryClass(row.primary))}>{row.primary}</td>
-                  <td className="py-3 pr-4 whitespace-nowrap">{phaseLabel(row.phase)}</td>
-                  <td className={cn("py-3 pr-4 font-mono text-xs uppercase", stanceClass(row.stance))}>
-                    {row.stance}
-                  </td>
-                  <td className="text-muted-foreground max-w-xs py-3 text-xs leading-relaxed">
-                    {row.note}
-                    <span className="mt-1 block">{row.secondary}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-muted-foreground mt-3 text-xs">
-          Swings on year-end index levels (100 at {DOW_PATH_YEARS[0]}). A primary stays in force until the
-          opposite peak or floor is taken out.
-        </p>
-      </section>
-
+      {tab === "performance" ? (
+        <>
       <section>
         <h2 className="text-muted-foreground mb-5 text-[11px] font-medium tracking-[0.24em] uppercase">
           Cumulative return rank
@@ -305,9 +245,12 @@ export function SectorAnalysis() {
       </section>
 
       <section>
-        <h2 className="text-muted-foreground mb-5 text-[11px] font-medium tracking-[0.24em] uppercase">
-          Year by year
-        </h2>
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.24em] uppercase">
+            Year by year
+          </h2>
+          <FeedSource>Desk reference</FeedSource>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-max min-w-full text-sm">
             <thead>
@@ -366,6 +309,116 @@ export function SectorAnalysis() {
           </table>
         </div>
       </section>
+        </>
+      ) : (
+        <>
+          {market === "NSE" ? <SectorIndiaMcap /> : null}
+
+          <section>
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.24em] uppercase">
+                Dow Theory
+              </h2>
+              <FeedSource>Desk reference</FeedSource>
+            </div>
+            <div className="border-border mb-8 grid gap-6 border-y py-8 md:grid-cols-3">
+              <div className="md:col-span-2">
+                <p className="text-muted-foreground text-[10px] tracking-[0.22em] uppercase">Market reading</p>
+                <p className="mt-2 font-heading text-2xl">{dow.regime}</p>
+                <p className="text-muted-foreground mt-2 max-w-xl text-sm leading-relaxed">{dow.regimeNote}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-[10px] tracking-[0.22em] uppercase">Breadth (volume analog)</p>
+                <p className="mt-2 font-mono text-lg tabular-nums">
+                  {dow.bullCount} bull · {dow.bearCount} bear · {dow.mixedCount} open
+                </p>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {formatPct(dow.breadth)} of sectors in a primary bull
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-8 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {DOW_TENETS.map((tenet) => (
+                <div key={tenet.title} className="border-border/60 rounded-lg border px-3 py-3">
+                  <p className="text-sm">{tenet.title}</p>
+                  <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{tenet.body}</p>
+                </div>
+              ))}
+            </div>
+
+            <h3 className="text-muted-foreground mb-4 text-[11px] font-medium tracking-[0.24em] uppercase">
+              Averages must confirm
+            </h3>
+            <div className="mb-8 grid gap-3 md:grid-cols-2">
+              {dow.pairs.map((pair) => (
+                <div key={pair.label} className="border-border/60 rounded-lg border px-4 py-3">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-sm">
+                      {pair.a} · {pair.b}
+                    </p>
+                    <p className={cn("text-xs tracking-wide uppercase", pair.confirmed ? "text-gain" : "text-loss")}>
+                      {pair.confirmed ? "Confirmed" : "Divergent"}
+                    </p>
+                  </div>
+                  <p className="text-muted-foreground mt-1 text-xs">{pair.label}</p>
+                  <p className="mt-2 text-xs leading-relaxed">{pair.reading}</p>
+                  <p className="text-muted-foreground mt-2 font-mono text-[10px]">
+                    {pair.a}: {pair.aPrimary} · {pair.b}: {pair.bPrimary}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <h3 className="text-muted-foreground mb-4 text-[11px] font-medium tracking-[0.24em] uppercase">
+              Primary trend by sector
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-max min-w-full text-sm">
+                <thead>
+                  <tr className="text-muted-foreground border-border border-b text-left text-[10px] tracking-[0.18em] uppercase">
+                    <th className="pb-3 pr-4 font-medium">Sector</th>
+                    <th className="pb-3 pr-4 font-medium">Path</th>
+                    <th className="pb-3 pr-4 font-medium">Structure</th>
+                    <th className="pb-3 pr-4 font-medium">Primary</th>
+                    <th className="pb-3 pr-4 font-medium">Phase</th>
+                    <th className="pb-3 pr-4 font-medium">Stance</th>
+                    <th className="pb-3 font-medium">Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dow.sectors.map((row) => (
+                    <tr key={row.sector} className="border-border/60 border-b last:border-0 align-top">
+                      <td className="py-3 pr-4">
+                        <div>{row.sector}</div>
+                        <div className="text-muted-foreground font-mono text-[10px]">{row.proxy}</div>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <DowSpark path={row.path} />
+                      </td>
+                      <td className="py-3 pr-4 font-mono text-xs whitespace-nowrap">{row.structure}</td>
+                      <td className={cn("py-3 pr-4 whitespace-nowrap", primaryClass(row.primary))}>{row.primary}</td>
+                      <td className="py-3 pr-4 whitespace-nowrap">{phaseLabel(row.phase)}</td>
+                      <td className={cn("py-3 pr-4 font-mono text-xs uppercase", stanceClass(row.stance))}>
+                        {row.stance}
+                      </td>
+                      <td className="text-muted-foreground max-w-xs py-3 text-xs leading-relaxed">
+                        {row.note}
+                        <span className="mt-1 block">{row.secondary}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-muted-foreground mt-3 text-xs">
+              Swings on year-end index levels (100 at {DOW_PATH_YEARS[0]}). A primary stays in force until the
+              opposite peak or floor is taken out.
+            </p>
+          </section>
+        </>
+      )}
     </div>
   );
 }
+

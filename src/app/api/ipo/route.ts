@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchNseIpoBook } from "@/lib/markets/nse-ipo";
+import { fetchChittorIpoBook } from "@/lib/markets/chittorgarh-ipo";
 
 function empty(book: { main: { open: unknown[]; upcoming: unknown[]; recent: unknown[] }; sme: { open: unknown[]; upcoming: unknown[]; recent: unknown[] } }) {
   return (
@@ -12,9 +12,10 @@ function empty(book: { main: { open: unknown[]; upcoming: unknown[]; recent: unk
   );
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const body = await fetchNseIpoBook();
+    const scrape = new URL(req.url).searchParams.get("sectors") === "1";
+    const body = await fetchChittorIpoBook({ scrape });
     if (body.error && empty(body)) {
       return NextResponse.json(body, { status: 502 });
     }

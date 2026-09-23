@@ -3,14 +3,17 @@
 import { FormEvent, Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { ProfitShareCard } from "@/components/desk/profit-share-card";
+import { SegmentShareCard } from "@/components/desk/segment-share-card";
 import { useHeaderSave } from "@/components/desk/header-save";
 import { EquityChart } from "@/components/desk/equity-chart";
+import { FeedSource } from "@/components/desk/feed-source";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDate, formatNum, formatPct, formatRr, pnlClass, toDayMonthYear, toIsoDate } from "@/lib/format";
-import { analyzePositions, annualizedOnCapital, hitRateByBuyDate, money, portfolioCurve, profitBySellDate, returnOnCapital, summaryForView, type HitRateBucket, type ProfitBucket } from "@/lib/portfolio/analytics";
+import { analyzePositions, hitRateByBuyDate, money, portfolioCurve, profitBySellDate, returnOnCapital, summaryForView, type HitRateBucket, type ProfitBucket } from "@/lib/portfolio/analytics";
 import { downloadProfitSharePng, profitShareText } from "@/lib/portfolio/share-profit";
+import { downloadSegmentSharePng, segmentShareText } from "@/lib/portfolio/share-segment";
 import {
   applyTradePrices,
   buyAvg,
@@ -68,7 +71,8 @@ type SortKey =
   | "openQty"
   | "openValue"
   | "unrealized"
-  | "account";
+  | "account"
+  | "segment";
 
 type SortState = { key: SortKey; dir: "asc" | "desc" };
 
@@ -116,6 +120,8 @@ function sortValue(row: PositionLine, key: SortKey): string | number {
       return row.unrealizedPnl;
     case "account":
       return row.account;
+    case "segment":
+      return segmentLabel(row.segment);
   }
 }
 
@@ -135,15 +141,15 @@ function sortRows(rows: PositionLine[], sort: SortState) {
 
 function toggleSort(prev: SortState, key: SortKey): SortState {
   if (prev.key === key) return { key, dir: prev.dir === "asc" ? "desc" : "asc" };
-  return { key, dir: key === "symbol" || key === "buyDate" || key === "sellDate" || key === "from" || key === "to" || key === "account" || key === "side" ? "asc" : "desc" };
+  return { key, dir: key === "symbol" || key === "buyDate" || key === "sellDate" || key === "from" || key === "to" || key === "account" || key === "segment" || key === "side" ? "asc" : "desc" };
 }
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: number }) {
   return (
-    <div className="min-w-0">
-      <p className="text-muted-foreground text-[10px] tracking-[0.22em] uppercase">{label}</p>
+    <div className="min-w-0 overflow-hidden">
+      <p className="text-muted-foreground truncate text-[10px] tracking-[0.14em] uppercase">{label}</p>
       <p
-        className={`mt-2 font-mono text-xl tracking-tight tabular-nums md:text-2xl ${
+        className={`mt-2 font-mono text-lg tracking-tight break-all tabular-nums md:text-xl ${
           tone !== undefined ? pnlClass(tone) : "text-foreground"
         }`}
       >
@@ -187,7 +193,13 @@ export function PortfolioBlotter() {
   const [editCapital, setEditCapital] = useState(false);
   const [shareNote, setShareNote] = useState<string | null>(null);
   const [showShareTable, setShowShareTable] = useState(false);
+  const [showSegmentShare, setShowSegmentShare] = useState(false);
+  const [bench, setBench] = useState<{
+    nifty50: number | null;
+    smallcap: number | null;
+  } | null>(null);
   const shareCardRef = useRef<HTMLDivElement>(null);
+  const segmentShareRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -284,16 +296,42 @@ export function PortfolioBlotter() {
     [bookView, totalCapital, accountCapitals],
   );
   const roc = useMemo(() => returnOnCapital(analytics.netPnl, viewCapital), [analytics.netPnl, viewCapital]);
-  const ann = useMemo(
-    () => annualizedOnCapital(roc, viewSummary?.from, viewSummary?.to),
-    [roc, viewSummary?.from, viewSummary?.to],
+  const rocBeforeCharges = useMemo(
+    () => returnOnCapital(analytics.realized, viewCapital),
+    [analytics.realized, viewCapital],
   );
-  const deployed = useMemo(
-    () => viewRows.reduce((sum, row) => sum + row.buyValue, 0),
-    [viewRows],
-  );
-  const utilization = useMemo(() => returnOnCapital(deployed, viewCapital), [deployed, viewCapital]);
   const curve = useMemo(() => portfolioCurve(viewRows, viewSummary), [viewRows, viewSummary]);
+  const benchFrom = viewSummary?.from || viewRows[0]?.from || "";
+  const benchTo = viewSummary?.to || viewRows[0]?.to || "";
+
+  useEffect(() => {
+    if (!benchFrom || !benchTo) {
+      setBench(null);
+      return;
+    }
+    let dead = false;
+    const load = async () => {
+      try {
+        const res = await fetch(
+          `/api/portfolio/benchmarks?from=${encodeURIComponent(benchFrom)}&to=${encodeURIComponent(benchTo)}`,
+          { cache: "no-store" },
+        );
+        const body = (await res.json()) as {
+          rows?: { id: string; return: number | null }[];
+        };
+        if (dead || !res.ok) return;
+        const nifty50 = body.rows?.find((row) => row.id === "nifty50")?.return ?? null;
+        const smallcap = body.rows?.find((row) => row.id === "smallcap")?.return ?? null;
+        setBench({ nifty50, smallcap });
+      } catch {
+        if (!dead) setBench(null);
+      }
+    };
+    void load();
+    return () => {
+      dead = true;
+    };
+  }, [benchFrom, benchTo]);
   const hitRates = useMemo(() => hitRateByBuyDate(viewRows), [viewRows]);
   const sellProfits = useMemo(() => profitBySellDate(viewRows), [viewRows]);
   const sharePayload = useMemo(
@@ -305,29 +343,49 @@ export function PortfolioBlotter() {
       from: viewSummary?.from,
       to: viewSummary?.to,
       capital: viewCapital,
+      realized: analytics.realized,
+      rocBeforeCharges,
+      charges: analytics.costs,
+      otherCD: viewSummary?.otherCreditDebit ?? 0,
       netPnl: analytics.netPnl,
       roc,
-      annualized: ann,
-      hitRate: hitRates.hitRate,
-      hits: hitRates.hits,
-      misses: hitRates.misses,
-      hitDated: hitRates.dated,
-      profits: sellProfits,
+      nifty50: bench?.nifty50 ?? null,
+      smallcap: bench?.smallcap ?? null,
+      curve,
     }),
     [
       bookView,
       segmentView,
       viewSummary,
       viewCapital,
+      analytics.realized,
+      rocBeforeCharges,
+      analytics.costs,
       analytics.netPnl,
       roc,
-      ann,
-      hitRates.hitRate,
-      hitRates.hits,
-      hitRates.misses,
-      hitRates.dated,
-      sellProfits,
+      bench,
+      curve,
     ],
+  );
+  const segmentSharePayload = useMemo(
+    () => ({
+      bookLabel:
+        bookView === "all"
+          ? "All accounts"
+          : `${accountLabel(bookView)}${segmentView === "all" ? "" : ` · ${segmentLabel(segmentView)}`}`,
+      from: viewSummary?.from,
+      to: viewSummary?.to,
+      capital: viewCapital,
+      rows: analytics.bySegment.map((row) => ({
+        id: row.id,
+        label: row.label,
+        names: row.trades,
+        gross: row.gross,
+        pnl: row.totalPnl,
+        roc: returnOnCapital(row.totalPnl, viewCapital),
+      })),
+    }),
+    [bookView, segmentView, viewSummary, viewCapital, analytics.bySegment],
   );
 
   async function copyProfitShare() {
@@ -360,14 +418,55 @@ export function PortfolioBlotter() {
     }
     const card = shareCardRef.current;
     if (!card) {
-      setShareNote("Table card is not ready. Show the share table and try again.");
+      setShareNote("Performance card is not ready. Show the share card and try again.");
       return;
     }
     try {
       await downloadProfitSharePng(card);
-      setShareNote("Saved eminent-corpus-profit-table.png — that’s a screenshot of the share table.");
+      setShareNote("Saved eminent-corpus-performance.png — capital through the chart.");
     } catch {
-      setShareNote("Could not save the table image. Use File → Force Reload, then try again.");
+      setShareNote("Could not save the image. Use File → Force Reload, then try again.");
+    }
+  }
+
+  async function copySegmentShare() {
+    const text = segmentShareText(segmentSharePayload);
+    try {
+      await navigator.clipboard.writeText(text);
+      setShareNote("Copied by-segment table. Paste into WhatsApp, X, or a caption.");
+    } catch {
+      setShareNote("Could not copy. Show the by-segment card and copy from there.");
+    }
+  }
+
+  async function shareSegment() {
+    const text = segmentShareText(segmentSharePayload);
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "Eminent Corpus · by segment", text });
+        setShareNote("Shared by-segment table.");
+        return;
+      } catch {
+        /* cancelled */
+      }
+    }
+    await copySegmentShare();
+  }
+
+  async function downloadSegmentShare() {
+    if (!showSegmentShare) {
+      flushSync(() => setShowSegmentShare(true));
+    }
+    const card = segmentShareRef.current;
+    if (!card) {
+      setShareNote("By-segment card is not ready. Show the share card and try again.");
+      return;
+    }
+    try {
+      await downloadSegmentSharePng(card);
+      setShareNote("Saved eminent-corpus-by-segment.png.");
+    } catch {
+      setShareNote("Could not save the by-segment image. Use File → Force Reload, then try again.");
     }
   }
 
@@ -683,34 +782,23 @@ export function PortfolioBlotter() {
   }, [autoFetch]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-10 px-4 py-10 md:px-8 md:py-14">
-      <header>
-        <p className="text-primary text-[11px] tracking-[0.3em] uppercase">Book</p>
-        <h1 className="font-heading mt-2 text-5xl font-semibold tracking-tight md:text-6xl">
-          Portfolio
-        </h1>
-        <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-relaxed">
-          Positions come from each account’s P&amp;L sheet. Click All for the combined dashboard, or
-          TR8076 / VFH197 / Fyers for that book. After an account is open, click Equity, Nifty 50,
-          or Commodity to see that sleeve. New names are added to a segment; old names stay (same
-          symbol is updated). Net = realized +
-          other credits/debits − charges (unrealized is ignored). Click Save in the top bar after you
-          add or edit rows. Saved to{" "}
-          <span className="font-mono text-foreground/80">data/positions.json</span>
-          {persist === "disk"
-            ? ". Saved on disk."
-            : persist === "error"
-              ? ". Disk save failed — still in this browser."
-              : ". Using this browser until disk is ready."}
-          {dirty ? " Unsaved changes." : ""}
+    <div className="flex w-full flex-1 flex-col gap-4 px-4 py-4 md:px-8 md:py-5">
+      <header className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 text-center">
+        <h1 className="font-heading text-xl font-semibold tracking-tight">Portfolio</h1>
+        <p className="text-muted-foreground text-xs">
+          Net = realized + other C/D − charges
+          {persist === "disk" ? " · disk" : persist === "error" ? " · disk failed" : " · this browser"}
+          {dirty ? " · unsaved" : ""}
         </p>
       </header>
 
+      <div className="grid min-w-0 flex-1 grid-cols-1 gap-5 md:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)] md:items-start">
+      <aside className="flex min-w-0 w-full flex-col gap-3 md:sticky md:top-[calc(var(--desk-nav-h,4rem)+0.75rem)] md:max-h-[calc(100vh-var(--desk-nav-h,4rem)-1.5rem)] md:overflow-y-auto">
       <section className="flex flex-col gap-3">
         <p className="text-muted-foreground text-[11px] font-medium tracking-[0.24em] uppercase">
           Books
         </p>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="flex flex-col gap-2">
           <button
             type="button"
             onClick={() => setView("all")}
@@ -737,119 +825,125 @@ export function PortfolioBlotter() {
             const capital = accountCapitals[account.id] ?? 0;
             const on = bookView === account.id;
             return (
-              <button
-                key={account.id}
-                type="button"
-                onClick={() => setView(account.id)}
-                className={`rounded-xl border px-4 py-3 text-left ${
-                  on ? "border-foreground/35 bg-card text-foreground" : "border-border bg-transparent"
-                }`}
-              >
-                <p className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
-                  {account.broker === account.label ? "Account" : account.broker}
-                </p>
-                <p className="mt-1 font-medium">{account.label}</p>
-                <p className="mt-2 font-mono text-sm tabular-nums text-muted-foreground">{names} names</p>
-                <p className={`mt-1 font-mono text-lg tabular-nums ${pnlClass(pnl)}`}>{money(pnl)}</p>
-                <p className="mt-1 font-mono text-xs tabular-nums text-muted-foreground">
-                  Capital {capital > 0 ? money(capital) : "—"}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {bookView !== "all" ? (
-        <section className="flex flex-col gap-3">
-          <p className="text-muted-foreground text-[11px] font-medium tracking-[0.24em] uppercase">
-            Segments · {accountLabel(bookView)}
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <button
-              type="button"
-              onClick={() => setSegment("all")}
-              className={`rounded-xl border px-4 py-3 text-left ${
-                segmentView === "all" ? "border-foreground/35 bg-card text-foreground" : "border-border bg-transparent"
-              }`}
-            >
-              <p className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">All segments</p>
-              <p className="mt-1 font-medium">Account book</p>
-              <p className="mt-2 font-mono text-sm tabular-nums text-muted-foreground">{accountRows.length} names</p>
-              <p className={`mt-1 font-mono text-lg tabular-nums ${pnlClass(accountBook.netPnl)}`}>
-                {money(accountBook.netPnl)}
-              </p>
-            </button>
-            {SEGMENTS.map((segment) => {
-              const rows = accountRows.filter((row) => row.segment === segment.id);
-              const names = rows.length;
-              const pnl = rows.reduce((sum, row) => sum + row.realizedPnl, 0);
-              const on = segmentView === segment.id;
-              return (
+              <div key={account.id} className="flex flex-col gap-2">
                 <button
-                  key={segment.id}
                   type="button"
-                  onClick={() => setSegment(segment.id)}
+                  onClick={() => setView(account.id)}
                   className={`rounded-xl border px-4 py-3 text-left ${
                     on ? "border-foreground/35 bg-card text-foreground" : "border-border bg-transparent"
                   }`}
                 >
-                  <p className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Segment</p>
-                  <p className="mt-1 font-medium">{segment.label}</p>
+                  <p className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+                    {account.broker === account.label ? "Account" : account.broker}
+                  </p>
+                  <p className="mt-1 font-medium">{account.label}</p>
                   <p className="mt-2 font-mono text-sm tabular-nums text-muted-foreground">{names} names</p>
                   <p className={`mt-1 font-mono text-lg tabular-nums ${pnlClass(pnl)}`}>{money(pnl)}</p>
+                  <p className="mt-1 font-mono text-xs tabular-nums text-muted-foreground">
+                    Capital {capital > 0 ? money(capital) : "—"}
+                  </p>
                 </button>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
+                {on ? (
+                  <div className="ml-3 flex flex-col gap-1.5 border-l border-border pl-3">
+                    <p className="text-muted-foreground pt-1 text-[10px] tracking-[0.18em] uppercase">
+                      Segments
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSegment("all")}
+                      className={`rounded-lg border px-3 py-2 text-left ${
+                        segmentView === "all"
+                          ? "border-foreground/35 bg-card text-foreground"
+                          : "border-border bg-transparent"
+                      }`}
+                    >
+                      <p className="text-sm font-medium">All segments</p>
+                      <p className={`mt-0.5 font-mono text-sm tabular-nums ${pnlClass(accountBook.netPnl)}`}>
+                        {money(accountBook.netPnl)} · {accountRows.length} names
+                      </p>
+                    </button>
+                    {SEGMENTS.map((segment) => {
+                      const rows = accountRows.filter((row) => row.segment === segment.id);
+                      const segPnl = rows.reduce((sum, row) => sum + row.realizedPnl, 0);
+                      const selected = segmentView === segment.id;
+                      return (
+                        <button
+                          key={segment.id}
+                          type="button"
+                          onClick={() => setSegment(segment.id)}
+                          className={`rounded-lg border px-3 py-2 text-left ${
+                            selected
+                              ? "border-foreground/35 bg-card text-foreground"
+                              : "border-border bg-transparent"
+                          }`}
+                        >
+                          <p className="text-sm font-medium">{segment.label}</p>
+                          <p className={`mt-0.5 font-mono text-sm tabular-nums ${pnlClass(segPnl)}`}>
+                            {money(segPnl)} · {rows.length} names
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+      </aside>
 
-      <section className="rounded-xl bg-card p-4 text-foreground">
-        <h2 className="text-[11px] font-medium tracking-[0.24em] text-muted-foreground uppercase">
-          P&amp;L / positions sheet
-        </h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Upload one segment file at a time (e.g. equity, Nifty 50, commodity for TR8076). New names
-          are added to that sleeve; existing names stay. Matching symbols are updated, not wiped.
-          Other segments and accounts stay. Drop files in{" "}
-          <span className="font-mono text-foreground">data/imports</span> or choose here.
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (file) void uploadWorkbook(file);
-            }}
-          />
-          <Button type="button" disabled={importBusy} onClick={() => fileRef.current?.click()}>
-            {importBusy ? "Reading…" : "Upload P&L"}
+      <div className="flex min-w-0 flex-1 flex-col gap-6">
+      <div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void uploadWorkbook(file);
+          }}
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" size="xs" disabled={importBusy} onClick={() => fileRef.current?.click()}>
+            {importBusy ? "Reading…" : "Upload"}
           </Button>
-          <Button type="button" variant="outline" disabled={importBusy} onClick={() => void fetchFromFolder()}>
-            Fetch from folder
+          <Button type="button" variant="outline" size="xs" disabled={importBusy} onClick={() => void fetchFromFolder()}>
+            Folder
           </Button>
-          <label className="ml-2 flex items-center gap-2 text-sm text-foreground/80">
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <input
               type="checkbox"
               checked={autoFetch}
               onChange={(e) => setAutoFetch(e.target.checked)}
             />
-            Autofetch every 20s
+            Auto
           </label>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="xs" onClick={() => void copyProfitShare()}>
+              Copy
+            </Button>
+            <Button type="button" variant="outline" size="xs" onClick={() => void downloadShareTable()}>
+              Download
+            </Button>
+            <Button type="button" size="xs" onClick={() => void shareProfit()}>
+              Share
+            </Button>
+          </div>
         </div>
-        {importMsg ? <p className="mt-3 text-sm text-muted-foreground">{importMsg}</p> : null}
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
-      </section>
+        {importMsg ? <p className="mt-1 text-xs text-muted-foreground">{importMsg}</p> : null}
+        {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
+        {shareNote ? <p className="mt-1 text-xs text-muted-foreground">{shareNote}</p> : null}
+      </div>
 
-      <section className="border-border grid gap-6 border-y py-6 md:grid-cols-[minmax(12rem,16rem)_1fr]">
-        <div>
+      <section className="border-border grid grid-cols-2 gap-x-6 gap-y-6 border-y py-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="min-w-0 overflow-hidden">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-muted-foreground text-[10px] tracking-[0.22em] uppercase">Total capital</p>
+            <p className="text-muted-foreground truncate text-[10px] tracking-[0.14em] uppercase">
+              Total capital
+            </p>
             <Button
               type="button"
               variant={editCapital ? "default" : "outline"}
@@ -875,7 +969,7 @@ export function PortfolioBlotter() {
               step="any"
               inputMode="decimal"
               placeholder="e.g. 1000000"
-              className="mt-2 h-10 bg-card font-mono text-foreground"
+              className="mt-2 h-9 bg-card font-mono text-foreground"
               value={capitalText}
               onChange={(e) => {
                 const raw = e.target.value;
@@ -888,36 +982,11 @@ export function PortfolioBlotter() {
               }}
             />
           ) : (
-            <p className="mt-2 font-mono text-xl tracking-tight tabular-nums md:text-2xl">
+            <p className="mt-2 font-mono text-lg tracking-tight break-all tabular-nums md:text-xl">
               {viewCapital > 0 ? money(viewCapital) : "—"}
             </p>
           )}
-          <p className="text-muted-foreground mt-2 text-xs">
-            {editCapital
-              ? `${bookView === "all" ? "Desk" : accountLabel(bookView)} capital in INR. Return uses this base, not buy value. Save in the header after you change it.`
-              : `Click Edit to change ${bookView === "all" ? "desk" : "this account"} capital. Return uses this base, not buy value.`}
-          </p>
         </div>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
-          <Stat
-            label="On capital"
-            value={roc == null ? "—" : formatPct(roc)}
-            tone={roc == null ? undefined : roc}
-          />
-          <Stat
-            label="Annualized"
-            value={ann == null ? "—" : formatPct(ann)}
-            tone={ann == null ? undefined : ann}
-          />
-          <Stat label="Deployed" value={money(deployed)} />
-          <Stat
-            label="Capital used"
-            value={utilization == null ? "—" : formatPct(utilization)}
-          />
-        </div>
-      </section>
-
-      <section className="border-border grid grid-cols-2 gap-x-6 gap-y-6 border-y py-6 md:grid-cols-4 xl:grid-cols-8">
         <Stat
           label="From"
           value={formatDate(viewSummary?.from || viewRows[0]?.from)}
@@ -928,7 +997,12 @@ export function PortfolioBlotter() {
         />
         <Stat label="Stocks" value={String(viewRows.length)} />
         <Stat label="Open" value={String(analytics.openCount)} />
-        <Stat label="Realized" value={money(analytics.realized)} tone={analytics.realized} />
+        <Stat label="Realized P&L" value={money(analytics.realized)} tone={analytics.realized} />
+        <Stat
+          label="Return on capital"
+          value={rocBeforeCharges == null ? "—" : formatPct(rocBeforeCharges)}
+          tone={rocBeforeCharges == null ? undefined : rocBeforeCharges}
+        />
         <Stat label="Charges" value={money(-analytics.costs)} tone={-analytics.costs} />
         <Stat
           label="Other C/D"
@@ -937,12 +1011,12 @@ export function PortfolioBlotter() {
         />
         <Stat label="Net P&L" value={money(analytics.netPnl)} tone={analytics.netPnl} />
         <Stat
-          label="Open weight"
-          value={analytics.topWeight ? formatPct(analytics.topWeight) : "—"}
-          tone={analytics.concentrated ? -1 : undefined}
+          label="Net return on capital"
+          value={roc == null ? "—" : formatPct(roc)}
+          tone={roc == null ? undefined : roc}
         />
       </section>
-      <p className="text-muted-foreground -mt-6 text-xs">
+      <p className="text-muted-foreground mt-3 text-xs">
         Figures
         {bookView === "all"
           ? " across all three accounts"
@@ -950,20 +1024,74 @@ export function PortfolioBlotter() {
         , from the P&amp;L names (row sum). Unrealized P&amp;L is ignored. Net = realized + other C/D − charges.
         {viewSummary?.from ? ` Period ${formatDate(viewSummary.from)} to ${formatDate(viewSummary.to)}.` : ""}{" "}
         {viewCapital > 0
-          ? `Return on ${money(viewCapital)} capital is ${roc == null ? "—" : formatPct(roc)}${
-              ann == null ? "" : `, annualized ${formatPct(ann)}`
-            }.`
-          : "Type total capital above to score return on the book."}{" "}
+          ? `Return on ${money(viewCapital)} capital is ${roc == null ? "—" : formatPct(roc)}.`
+          : "Click Edit on Total capital to score return on the book."}{" "}
+        {editCapital
+          ? ` ${bookView === "all" ? "Desk" : accountLabel(bookView)} capital in INR. Return uses this base, not buy value. Save in the header after you change it.`
+          : ""}
         Figures in INR.
       </p>
 
       <section>
-        <h2 className="text-muted-foreground mb-4 text-[11px] font-medium tracking-[0.24em] uppercase">
-          Total portfolio
-        </h2>
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.24em] uppercase">
+              Vs Nifty 50 · Smallcap 100
+            </h2>
+            <p className="text-muted-foreground mt-2 text-xs">
+              Same dates as this view. Book is net return on capital. Nifty 50 from Yahoo daily close;
+              Smallcap 100 from NSE EOD when Yahoo has no history. Not a recommendation.
+            </p>
+          </div>
+          <FeedSource>Yahoo · NSE</FeedSource>
+        </div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-3 lg:grid-cols-5">
+          <Stat
+            label="Book"
+            value={roc == null ? "—" : formatPct(roc)}
+            tone={roc == null ? undefined : roc}
+          />
+          <Stat
+            label="Nifty 50"
+            value={bench?.nifty50 == null ? "—" : formatPct(bench.nifty50)}
+            tone={bench?.nifty50 ?? undefined}
+          />
+          <Stat
+            label="Vs Nifty 50"
+            value={roc == null || bench?.nifty50 == null ? "—" : formatPct(roc - bench.nifty50)}
+            tone={roc == null || bench?.nifty50 == null ? undefined : roc - bench.nifty50}
+          />
+          <Stat
+            label="Smallcap 100"
+            value={bench?.smallcap == null ? "—" : formatPct(bench.smallcap)}
+            tone={bench?.smallcap ?? undefined}
+          />
+          <Stat
+            label="Vs Smallcap 100"
+            value={roc == null || bench?.smallcap == null ? "—" : formatPct(roc - bench.smallcap)}
+            tone={roc == null || bench?.smallcap == null ? undefined : roc - bench.smallcap}
+          />
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.24em] uppercase">
+            Total portfolio
+          </h2>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => setShowShareTable((open) => !open)}
+          >
+            {showShareTable ? "Hide share card" : "Show share card"}
+          </Button>
+        </div>
         <p className="text-muted-foreground -mt-2 mb-4 text-xs">
           Cumulative net (realized + other C/D − charges) for this view. Names plot on the exit date
-          (sell for longs, buy/cover for shorts); the rest use the P&amp;L period end.
+          (sell for longs, buy/cover for shorts); the rest use the P&amp;L period end. Copy / Download /
+          Share above the figures covers this block through the chart.
         </p>
         <EquityChart
           points={curve}
@@ -972,6 +1100,11 @@ export function PortfolioBlotter() {
           ariaLabel="Total portfolio net P&L"
           emptyLabel="Upload a P&L sheet to plot the book."
         />
+        {showShareTable ? (
+          <div className="mt-6">
+            <ProfitShareCard payload={sharePayload} cardRef={shareCardRef} />
+          </div>
+        ) : null}
       </section>
 
       <section>
@@ -1007,32 +1140,12 @@ export function PortfolioBlotter() {
       </section>
 
       <section>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.24em] uppercase">
-            Profit
-          </h2>
-          {sellProfits.dated > 0 ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="outline" size="xs" onClick={() => void copyProfitShare()}>
-                Copy
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                onClick={() => void downloadShareTable()}
-              >
-                Download table
-              </Button>
-              <Button type="button" size="xs" onClick={() => void shareProfit()}>
-                Share
-              </Button>
-            </div>
-          ) : null}
-        </div>
+        <h2 className="text-muted-foreground mb-4 text-[11px] font-medium tracking-[0.24em] uppercase">
+          Profit
+        </h2>
         <p className="text-muted-foreground -mt-1 mb-4 text-xs">
           Realized P&amp;L by exit date (sell on longs, buy/cover on shorts). Months, quarters, and
-          Indian FY years. Copy text or download a card for socials.
+          Indian FY years.
           {sellProfits.names - sellProfits.dated > 0
             ? ` ${sellProfits.names - sellProfits.dated} name${sellProfits.names - sellProfits.dated === 1 ? "" : "s"} have no exit date.`
             : ""}
@@ -1049,29 +1162,10 @@ export function PortfolioBlotter() {
           </div>
         )}
         {sellProfits.dated > 0 ? (
-          <>
-            <div className="mt-8">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-muted-foreground text-[10px] tracking-[0.18em] uppercase">
-                  Share table
-                </h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  onClick={() => setShowShareTable((open) => !open)}
-                >
-                  {showShareTable ? "Hide" : "Show"}
-                </Button>
-              </div>
-              {showShareTable ? <ProfitShareCard payload={sharePayload} cardRef={shareCardRef} /> : null}
-            </div>
-            <p className="text-muted-foreground mt-4 text-xs">
-              Overall {money(sellProfits.realized)} from {sellProfits.dated} name
-              {sellProfits.dated === 1 ? "" : "s"} with an exit date.
-              {shareNote ? ` ${shareNote}` : ""}
-            </p>
-          </>
+          <p className="text-muted-foreground mt-4 text-xs">
+            Overall {money(sellProfits.realized)} from {sellProfits.dated} name
+            {sellProfits.dated === 1 ? "" : "s"} with an exit date.
+          </p>
         ) : null}
       </section>
 
@@ -1399,10 +1493,36 @@ export function PortfolioBlotter() {
               <SliceTable rows={analytics.byAccount} />
             </div>
             <div>
-              <h2 className="text-muted-foreground mb-4 text-[11px] font-medium tracking-[0.24em] uppercase">
-                By segment
-              </h2>
-              <SliceTable rows={analytics.bySegment} />
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.24em] uppercase">
+                  By segment
+                </h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="outline" size="xs" onClick={() => void copySegmentShare()}>
+                    Copy
+                  </Button>
+                  <Button type="button" variant="outline" size="xs" onClick={() => void downloadSegmentShare()}>
+                    Download
+                  </Button>
+                  <Button type="button" size="xs" onClick={() => void shareSegment()}>
+                    Share
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => setShowSegmentShare((open) => !open)}
+                  >
+                    {showSegmentShare ? "Hide card" : "Show card"}
+                  </Button>
+                </div>
+              </div>
+              <SliceTable rows={analytics.bySegment} capital={viewCapital} />
+              {showSegmentShare ? (
+                <div className="mt-4">
+                  <SegmentShareCard payload={segmentSharePayload} cardRef={segmentShareRef} />
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -1479,6 +1599,7 @@ export function PortfolioBlotter() {
                   <th className="px-3 py-3 font-medium">Open type</th>
                   <SortTh label="Open value" column="openValue" sort={bookSort} onSort={setBookSort} align="right" />
                   <SortTh label="Account" column="account" sort={bookSort} onSort={setBookSort} />
+                  <SortTh label="Segment" column="segment" sort={bookSort} onSort={setBookSort} />
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -1525,6 +1646,7 @@ export function PortfolioBlotter() {
                       <td className="px-3 py-3">{row.openQtyType || (row.openQty ? "Open" : "Flat")}</td>
                       <td className="px-3 py-3 text-right font-mono tabular-nums">{money(row.openValue)}</td>
                       <td className="px-3 py-3 text-xs">{accountLabel(row.account)}</td>
+                      <td className="px-3 py-3 text-xs">{segmentLabel(row.segment)}</td>
                       <td className="px-4 py-3 text-right">
                         <Button type="button" variant="ghost" size="xs" onClick={() => removeRow(row.id)}>
                           Remove
@@ -1645,6 +1767,8 @@ export function PortfolioBlotter() {
           </div>
         </form>
       </section>
+      </div>
+      </div>
     </div>
   );
 }
@@ -1777,6 +1901,7 @@ function ProfitTable({ title, rows }: { title: string; rows: ProfitBucket[] }) {
 
 function SliceTable({
   rows,
+  capital,
 }: {
   rows: {
     id: string;
@@ -1785,7 +1910,9 @@ function SliceTable({
     gross: number;
     totalPnl: number;
   }[];
+  capital?: number;
 }) {
+  const showRoc = capital != null;
   return (
     <div className="overflow-x-auto rounded-xl bg-card text-foreground">
       <table className="w-full text-sm">
@@ -1795,19 +1922,32 @@ function SliceTable({
             <th className="px-3 py-2 text-right font-medium">Names</th>
             <th className="px-3 py-2 text-right font-medium">Gross</th>
             <th className="px-4 py-2 text-right font-medium">P&amp;L</th>
+            {showRoc ? <th className="px-4 py-2 text-right font-medium">On cap</th> : null}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="border-b border-border/50 last:border-0">
-              <td className="px-4 py-2">{row.label}</td>
-              <td className="px-3 py-2 text-right font-mono tabular-nums">{row.trades}</td>
-              <td className="px-3 py-2 text-right font-mono tabular-nums">{money(row.gross)}</td>
-              <td className={`px-4 py-2 text-right font-mono tabular-nums ${pnlClass(row.totalPnl)}`}>
-                {money(row.totalPnl)}
-              </td>
-            </tr>
-          ))}
+          {rows.map((row) => {
+            const roc = showRoc ? returnOnCapital(row.totalPnl, capital) : null;
+            return (
+              <tr key={row.id} className="border-b border-border/50 last:border-0">
+                <td className="px-4 py-2">{row.label}</td>
+                <td className="px-3 py-2 text-right font-mono tabular-nums">{row.trades}</td>
+                <td className="px-3 py-2 text-right font-mono tabular-nums">{money(row.gross)}</td>
+                <td className={`px-4 py-2 text-right font-mono tabular-nums ${pnlClass(row.totalPnl)}`}>
+                  {money(row.totalPnl)}
+                </td>
+                {showRoc ? (
+                  <td
+                    className={`px-4 py-2 text-right font-mono tabular-nums ${
+                      roc == null ? "text-muted-foreground" : pnlClass(row.totalPnl)
+                    }`}
+                  >
+                    {roc == null ? "—" : formatPct(roc)}
+                  </td>
+                ) : null}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

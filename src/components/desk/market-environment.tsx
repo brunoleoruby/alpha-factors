@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { flushSync } from "react-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FeedSource } from "@/components/desk/feed-source";
 import { IndexBehaviorPopup, type BehaviorPayload } from "@/components/desk/index-behavior-popup";
 import { PreviousCloseCard, TodayInsightCard } from "@/components/desk/environment-share-card";
 import { NseBreadthPanel } from "@/components/desk/nse-breadth-panel";
@@ -308,8 +309,13 @@ export function MarketEnvironment() {
   return (
     <div className="mx-auto flex w-full max-w-[1800px] flex-1 flex-col gap-5 px-4 pb-10 md:px-6">
       <header className="mt-2">
-        <p className="text-primary text-xs font-medium tracking-[0.22em] uppercase">Varun G V · personal</p>
-        <h1 className="font-heading mt-1 text-3xl font-semibold tracking-tight md:text-4xl">Market environment</h1>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-primary text-xs font-medium tracking-[0.22em] uppercase">Varun G V · personal</p>
+            <h1 className="font-heading mt-1 text-3xl font-semibold tracking-tight md:text-4xl">Market environment</h1>
+          </div>
+          <FeedSource>Yahoo · NSE · Chartink</FeedSource>
+        </div>
         <p className="text-muted-foreground mt-2 max-w-3xl text-sm leading-relaxed">
           Six columns, nothing mixed: Indian indices, USA indices, Asia indices, commodity, currency, and
           crude oil. NSE exchange breadth sits under the tape. Click a ticker for the tape-rhyme popup —
@@ -332,6 +338,9 @@ export function MarketEnvironment() {
             <Card key={col.id} className="border-primary/15 bg-card/90 min-w-0">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base leading-tight">{col.title}</CardTitle>
+                <CardAction>
+                  <FeedSource>{col.source}</FeedSource>
+                </CardAction>
                 <CardDescription className="text-xs">{col.blurb}</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">

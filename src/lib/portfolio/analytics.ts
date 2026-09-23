@@ -496,16 +496,6 @@ export function returnOnCapital(pnl: number, capital: number) {
   return pnl / capital;
 }
 
-export function annualizedOnCapital(roc: number | null, from?: string, to?: string) {
-  if (roc == null || !from || !to) return null;
-  const start = Date.parse(from);
-  const end = Date.parse(to);
-  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null;
-  const years = (end - start) / (365.25 * 86_400_000);
-  if (!(years > 0)) return null;
-  return roc / years;
-}
-
 export type HitRateBucket = {
   id: string;
   label: string;

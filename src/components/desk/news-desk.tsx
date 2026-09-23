@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { EquityChart } from "@/components/desk/equity-chart";
 import { TradingViewChart } from "@/components/desk/tradingview-chart";
+import { FeedSource } from "@/components/desk/feed-source";
 import { NewsControls } from "@/components/desk/news-controls";
 import { NewsTape } from "@/components/desk/news-tape";
 import { PatternInspector } from "@/components/desk/pattern-inspector";
@@ -119,7 +120,9 @@ export function NewsDesk({
             prints, and paper-trade only when the recognized behavior is strong enough.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col items-start gap-2 md:items-end">
+          <FeedSource>TradingView</FeedSource>
+          <div className="flex flex-wrap items-center gap-2">
           <Badge variant={desk.running ? "default" : "secondary"}>
             {desk.running ? "Tape live" : "Idle"}
           </Badge>
@@ -134,6 +137,7 @@ export function NewsDesk({
               Advance tape live
             </Button>
           )}
+          </div>
         </div>
       </header>
 

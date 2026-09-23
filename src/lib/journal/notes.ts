@@ -64,6 +64,15 @@ export function nextSerial(notes: TimeFrameNote[]) {
   return notes.reduce((max, n) => Math.max(max, n.serial), 0) + 1;
 }
 
+export function mergeNotes(disk: TimeFrameNote[], local: TimeFrameNote[]): TimeFrameNote[] {
+  const byId = new Map<string, TimeFrameNote>();
+  for (const row of disk) byId.set(row.id, row);
+  for (const row of local) {
+    if (!byId.has(row.id)) byId.set(row.id, row);
+  }
+  return [...byId.values()].sort((a, b) => b.serial - a.serial);
+}
+
 export function trialTally(notes: TimeFrameNote[]) {
   return {
     n: notes.length,

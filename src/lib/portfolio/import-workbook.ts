@@ -1,8 +1,8 @@
 import * as XLSX from "xlsx";
 import {
   type Trade,
-  type TradeAccount,
-  type TradeSegment,
+  inferAccount,
+  inferSegment,
 } from "./trades";
 
 export type ImportReport = {
@@ -100,19 +100,12 @@ function parseSide(value: unknown): "Buy" | "Sell" | null {
   return null;
 }
 
-function parseAccount(value: unknown, hint: string): TradeAccount {
-  const blob = `${norm(value)} ${norm(hint)}`;
-  if (blob.includes("vfh197")) return "zerodha-vfh197";
-  if (blob.includes("tr8076") || blob.includes("tr 8076")) return "zerodha-tr8076";
-  if (blob.includes("fyers")) return "fyers";
-  return "zerodha-tr8076";
+function parseAccount(value: unknown, hint: string) {
+  return inferAccount(value, hint);
 }
 
-function parseSegment(value: unknown, sheet: string, hint: string): TradeSegment {
-  const blob = `${norm(value)} ${norm(sheet)} ${norm(hint)}`;
-  if (blob.includes("comm") || blob.includes("mcx") || blob.includes("commodity")) return "commodity";
-  if (blob.includes("nifty") || blob.includes("nfo") || /\bfo\b/.test(blob)) return "nifty50";
-  return "equity";
+function parseSegment(value: unknown, sheet: string, hint: string) {
+  return inferSegment(value, sheet, hint);
 }
 
 function parseExecutedAt(value: unknown, date: string) {

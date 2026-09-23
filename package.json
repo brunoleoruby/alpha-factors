@@ -4,7 +4,7 @@
   "private": true,
   "main": "electron/main.cjs",
   "scripts": {
-    "dev": "next dev --webpack --port 43123 --hostname 0.0.0.0",
+    "dev": "next dev --port 43123 --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start --port 43123 --hostname 127.0.0.1",
     "desktop": "node electron/launch.cjs",

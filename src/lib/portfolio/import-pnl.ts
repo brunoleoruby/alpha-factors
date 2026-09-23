@@ -6,7 +6,7 @@ import {
   type PnlSummary,
   type PositionLine,
 } from "./positions";
-import { type Trade, type TradeAccount, type TradeSegment } from "./trades";
+import { type Trade, inferAccount, inferSegment } from "./trades";
 import { parseWorkbook } from "./import-workbook";
 
 export type ParsedImport =
@@ -43,19 +43,12 @@ function num(value: unknown) {
   return Number.isFinite(n) ? n : 0;
 }
 
-function parseAccount(value: unknown, hint: string): TradeAccount {
-  const blob = `${norm(value)} ${norm(hint)}`;
-  if (blob.includes("vfh197")) return "zerodha-vfh197";
-  if (blob.includes("tr8076") || blob.includes("tr 8076")) return "zerodha-tr8076";
-  if (blob.includes("fyers")) return "fyers";
-  return "zerodha-tr8076";
+function parseAccount(value: unknown, hint: string) {
+  return inferAccount(value, hint);
 }
 
-function parseSegment(value: unknown, sheet: string, hint: string): TradeSegment {
-  const blob = `${norm(value)} ${norm(sheet)} ${norm(hint)}`;
-  if (blob.includes("comm") || blob.includes("mcx") || blob.includes("commodity")) return "commodity";
-  if (blob.includes("nifty") || blob.includes("nfo") || /\bfo\b/.test(blob)) return "nifty50";
-  return "equity";
+function parseSegment(value: unknown, sheet: string, hint: string) {
+  return inferSegment(value, sheet, hint);
 }
 
 function scanClientId(rows: unknown[][]) {
@@ -68,15 +61,22 @@ function scanClientId(rows: unknown[][]) {
 
 function looksLikePnlHeader(cells: unknown[]) {
   const keys = cells.map(norm);
-  return (
-    keys.includes("symbol") &&
-    keys.includes("buy value") &&
-    (keys.includes("sell value") || keys.includes("open quantity"))
-  );
+  if (keys.includes("symbol") && keys.includes("buy value") && (keys.includes("sell value") || keys.includes("open quantity"))) {
+    return true;
+  }
+  return looksLikeFyersPnlHeader(keys);
+}
+
+function looksLikeFyersPnlHeader(keys: string[]) {
+  const hasSym = keys.includes("symbol name") || keys.includes("symbol code") || keys.includes("symbol");
+  const hasPx = keys.includes("buy price") && keys.includes("sell price");
+  const hasPnl = keys.includes("gross p&l") || keys.includes("realised p&l") || keys.includes("realized p&l");
+  return hasSym && hasPx && hasPnl;
 }
 
 function workbookLooksLikePnl(wb: XLSX.WorkBook, fileName: string) {
-  if (/\bpnl\b/i.test(fileName) || /^pnl[-_]/i.test(fileName)) return true;
+  if (/\bpnl\b/i.test(fileName) || /\bp&l\b/i.test(fileName) || /realis[e]?d_p&l/i.test(fileName) || /(^|[_\-\s])pl([_\-\s.]|$)/i.test(fileName)) return true;
+  if (/fyers/i.test(fileName) && /nifty|derivat|nfo|commod|mcx|\bfo\b/i.test(fileName)) return true;
   for (const name of wb.SheetNames) {
     const sheet = wb.Sheets[name];
     if (!sheet) continue;
@@ -90,7 +90,13 @@ function workbookLooksLikePnl(wb: XLSX.WorkBook, fileName: string) {
       rows.some((row) =>
         String(row?.[0] ?? "")
           .toLowerCase()
-          .includes("p&l statement"),
+          .includes("p&l statement") ||
+        String(row?.[1] ?? "")
+          .toLowerCase()
+          .includes("realised p&l") ||
+        String(row?.[1] ?? "")
+          .toLowerCase()
+          .includes("realized p&l"),
       )
     ) {
       return true;
@@ -113,11 +119,21 @@ function cell(row: unknown[], index: number) {
   return row[index];
 }
 
+function isoDate(raw: string) {
+  const iso = raw.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const dmy = raw.trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  return "";
+}
+
 function parseRange(rows: unknown[][]) {
   for (const row of rows.slice(0, 20)) {
-    const title = String(row?.[0] ?? "");
-    const hit = title.match(/from\s+(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/i);
-    if (hit) return { from: hit[1], to: hit[2], title };
+    const title = `${row?.[0] ?? ""} ${row?.[1] ?? ""}`.trim();
+    const iso = title.match(/from\s+(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/i);
+    if (iso) return { from: iso[1], to: iso[2], title };
+    const dmy = title.match(/from\s+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})\s+to\s+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/i);
+    if (dmy) return { from: isoDate(dmy[1]), to: isoDate(dmy[2]), title };
   }
   return { from: "", to: "", title: "" };
 }
@@ -142,7 +158,7 @@ function parseSummary(rows: unknown[][], until = 80) {
     ) {
       otherCreditDebit = value;
     }
-    if (key === "realized p&l") realizedPnl = value;
+    if (key === "realized p&l" || key === "realised p&l" || key === "gross p&l") realizedPnl = value;
     if (key === "unrealized p&l") unrealizedPnl = value;
   }
   return { charges, otherCreditDebit, realizedPnl, unrealizedPnl };
@@ -173,12 +189,19 @@ function parsePnlSheet(
   if (headerAt < 0) return { positions: [], summary: null, skipped: 0 };
 
   const header = (rows[headerAt] ?? []).map((h) => String(h ?? "").trim());
-  const iSymbol = pickIndex(header, ["symbol"]);
+  const fyers = looksLikeFyersPnlHeader(header.map(norm));
+  const iSymbol = fyers
+    ? pickIndex(header, ["symbol name", "symbol code", "symbol"])
+    : pickIndex(header, ["symbol"]);
   const iIsin = pickIndex(header, ["isin"]);
-  const iQty = pickIndex(header, ["quantity"]);
+  const iQty = pickIndex(header, ["qty", "quantity"]);
+  const iBuyQty = pickIndex(header, ["buy qty", "buy quantity"]);
+  const iSellQty = pickIndex(header, ["sell qty", "sell quantity"]);
   const iBuy = pickIndex(header, ["buy value"]);
   const iSell = pickIndex(header, ["sell value"]);
-  const iRpnl = pickIndex(header, ["realized p&l"]);
+  const iBuyPx = pickIndex(header, ["buy price"]);
+  const iSellPx = pickIndex(header, ["sell price"]);
+  const iRpnl = pickIndex(header, ["realized p&l", "realised p&l", "gross p&l"]);
   const iRpct = pickIndex(header, ["realized p&l pct.", "realized p&l pct", "realized p&l %"]);
   const iPrev = pickIndex(header, ["previous closing price"]);
   const iOpenQty = pickIndex(header, ["open quantity"]);
@@ -186,6 +209,7 @@ function parsePnlSheet(
   const iOpenVal = pickIndex(header, ["open value"]);
   const iUpnl = pickIndex(header, ["unrealized p&l"]);
   const iUpct = pickIndex(header, ["unrealized p&l pct.", "unrealized p&l pct", "unrealized p&l %"]);
+  const iSeg = pickIndex(header, ["segment"]);
 
   const positions: PositionLine[] = [];
   let skipped = 0;
@@ -196,25 +220,29 @@ function parsePnlSheet(
     const symbol = String(cell(line, iSymbol) ?? "")
       .trim()
       .toUpperCase();
-    if (!symbol || symbol === "SYMBOL") {
+    if (!symbol || symbol === "SYMBOL" || symbol === "SYMBOL NAME" || symbol === "SYMBOL CODE") {
       skipped += 1;
       continue;
     }
-    const id = positionId(account, segment, symbol);
-    if (seen.has(id)) {
-      skipped += 1;
-      continue;
-    }
-    seen.add(id);
-    const quantity = num(cell(line, iQty));
-    const buyValue = num(cell(line, iBuy));
-    const sellValue = num(cell(line, iSell));
+    const quantity = num(cell(line, iQty)) || num(cell(line, iBuyQty)) || num(cell(line, iSellQty));
+    const buyPrice = num(cell(line, iBuyPx));
+    const sellPrice = num(cell(line, iSellPx));
+    const buyValue = iBuy >= 0 ? num(cell(line, iBuy)) : quantity * buyPrice;
+    const sellValue = iSell >= 0 ? num(cell(line, iSell)) : quantity * sellPrice;
     if (!(quantity || buyValue || sellValue || num(cell(line, iOpenQty)))) {
       skipped += 1;
       continue;
     }
     const openQty = num(cell(line, iOpenQty));
     const openQtyType = String(cell(line, iOpenType) ?? "").trim();
+    const realizedPnl = num(cell(line, iRpnl));
+    const sleeve = parseSegment(cell(line, iSeg), sheetName, `${fileName} ${symbol}`);
+    const id = positionId(account, sleeve, symbol);
+    if (seen.has(id)) {
+      skipped += 1;
+      continue;
+    }
+    seen.add(id);
     positions.push({
       id,
       symbol,
@@ -226,11 +254,11 @@ function parsePnlSheet(
       quantity,
       buyValue,
       sellValue,
-      buyPrice: 0,
-      sellPrice: 0,
+      buyPrice,
+      sellPrice,
       riskAmount: 0,
-      realizedPnl: num(cell(line, iRpnl)),
-      realizedPnlPct: num(cell(line, iRpct)),
+      realizedPnl,
+      realizedPnlPct: num(cell(line, iRpct)) || (buyValue ? realizedPnl / buyValue : 0),
       prevClose: num(cell(line, iPrev)),
       openQty,
       openQtyType,
@@ -239,15 +267,19 @@ function parsePnlSheet(
       unrealizedPnlPct: num(cell(line, iUpct)),
       side: inferBookSide({ openQtyType, openQty }),
       account,
-      segment,
+      segment: sleeve,
       source: "file",
-      notes: "",
+      notes: fyers ? "Fyers realised P&L" : "",
     });
   }
 
+  const summarySegment =
+    positions.length && positions.every((row) => row.segment === positions[0].segment)
+      ? positions[0].segment
+      : segment;
   const summary: PnlSummary = {
     account,
-    segment,
+    segment: summarySegment,
     from: range.from,
     to: range.to,
     charges: totals.charges,

@@ -92,24 +92,18 @@ export function LiveBookStrip() {
       <div className="grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4 xl:grid-cols-8">
         <Chip label="Stocks" value={String(positions.length)} />
         <Chip label="Realized" value={money(book.realized)} tone={book.realized} />
-        <Chip label="Charges" value={money(-book.costs)} tone={-book.costs} />
-        <Chip label="Net P&L" value={money(book.netPnl)} tone={book.netPnl} />
         <Chip
           label="On capital"
           value={roc == null ? "—" : formatPct(roc)}
           tone={roc == null ? undefined : roc}
         />
+        <Chip label="Charges" value={money(-book.costs)} tone={-book.costs} />
+        <Chip label="Net P&L" value={money(book.netPnl)} tone={book.netPnl} />
         <Chip label="Open names" value={String(book.names)} />
         <Chip label="Open gross" value={money(book.gross)} />
-        <Chip
-          label="Top weight"
-          value={book.topWeight ? formatPct(book.topWeight) : "—"}
-          tone={book.concentrated ? -1 : undefined}
-        />
       </div>
       <p className="text-muted-foreground mt-4 text-xs">
         Net = realized + other C/D − charges from the P&amp;L file. Unrealized is ignored.
-        {book.concentrated ? " Top open name ≥ 50% of gross." : ""}
       </p>
     </section>
   );

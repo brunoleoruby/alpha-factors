@@ -12,6 +12,7 @@ export type EnvColumn = {
   id: EnvColumnId;
   title: string;
   blurb: string;
+  source: string;
   rows: EnvInstrument[];
 };
 
@@ -20,6 +21,7 @@ export const ENV_COLUMNS: EnvColumn[] = [
     id: "india",
     title: "Indian indices",
     blurb: "NSE cash-market tape.",
+    source: "Yahoo",
     rows: [
       { id: "nifty", yahoo: "^NSEI", name: "Nifty 50", short: "NIFTY", digits: 2 },
       { id: "smallcap", yahoo: "NIFTY_SMLCAP_100.NS", name: "Nifty Smallcap 100", short: "SMLCAP", digits: 2 },
@@ -32,6 +34,7 @@ export const ENV_COLUMNS: EnvColumn[] = [
     id: "usa",
     title: "USA indices",
     blurb: "US cash indices and vol.",
+    source: "Yahoo",
     rows: [
       { id: "spx", yahoo: "^GSPC", name: "S&P 500", short: "SPX", digits: 2 },
       { id: "ndx", yahoo: "^NDX", name: "Nasdaq 100", short: "NDX", digits: 2 },
@@ -44,6 +47,7 @@ export const ENV_COLUMNS: EnvColumn[] = [
     id: "asia",
     title: "Asia indices",
     blurb: "Overnight Asia session, plus GIFT Nifty for the India open.",
+    source: "Yahoo · TradingView",
     rows: [
       { id: "giftnifty", yahoo: "TV:NSEIX:NIFTY1!", name: "GIFT Nifty", short: "GIFT", digits: 2 },
       { id: "n225", yahoo: "^N225", name: "Nikkei 225", short: "NKY", digits: 2 },
@@ -58,6 +62,7 @@ export const ENV_COLUMNS: EnvColumn[] = [
     id: "commodity",
     title: "Commodity",
     blurb: "Metals and gas. Crude is its own column.",
+    source: "Yahoo",
     rows: [
       { id: "gold", yahoo: "GC=F", name: "Gold", short: "GC", digits: 2 },
       { id: "silver", yahoo: "SI=F", name: "Silver", short: "SI", digits: 3 },
@@ -71,6 +76,7 @@ export const ENV_COLUMNS: EnvColumn[] = [
     id: "currency",
     title: "Currency",
     blurb: "Rupee, dollar, and G10.",
+    source: "Yahoo",
     rows: [
       { id: "usdinr", yahoo: "INR=X", name: "USD / INR", short: "USDINR", digits: 4 },
       { id: "dxy", yahoo: "DX-Y.NYB", name: "US Dollar Index", short: "DXY", digits: 3 },
@@ -83,6 +89,7 @@ export const ENV_COLUMNS: EnvColumn[] = [
     id: "crude",
     title: "Crude oil",
     blurb: "WTI and Brent, not mixed into metals.",
+    source: "Yahoo",
     rows: [
       { id: "wti", yahoo: "CL=F", name: "WTI crude", short: "CL", digits: 2 },
       { id: "brent", yahoo: "BZ=F", name: "Brent crude", short: "BZ", digits: 2 },

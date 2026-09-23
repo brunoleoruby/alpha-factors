@@ -47,8 +47,48 @@ export function accountLabel(id: TradeAccount) {
   return row ? `${row.broker} ${row.label}` : id;
 }
 
+/** Zerodha client codes plus Fyers (YG02277 and fyers-named files). */
+export function inferAccount(...parts: unknown[]): TradeAccount {
+  const blob = parts
+    .map((part) =>
+      String(part ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " "),
+    )
+    .join(" ");
+  if (blob.includes("vfh197")) return "zerodha-vfh197";
+  if (blob.includes("tr8076") || blob.includes("tr 8076")) return "zerodha-tr8076";
+  if (blob.includes("fyers") || blob.includes("yg02277")) return "fyers";
+  return "zerodha-tr8076";
+}
+
 export function segmentLabel(id: TradeSegment) {
   return SEGMENTS.find((s) => s.id === id)?.label ?? id;
+}
+
+/** File / sheet / venue labels. Derivative, NFO, F&O → Nifty 50 on this desk. */
+export function inferSegment(...parts: unknown[]): TradeSegment {
+  const blob = parts
+    .map((part) =>
+      String(part ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " "),
+    )
+    .join(" ");
+  if (blob.includes("comm") || blob.includes("mcx") || blob.includes("commodity")) return "commodity";
+  if (
+    blob.includes("nifty") ||
+    blob.includes("nfo") ||
+    blob.includes("derivat") ||
+    blob.includes("f&o") ||
+    blob.includes("fno") ||
+    /\bfo\b/.test(blob)
+  ) {
+    return "nifty50";
+  }
+  return "equity";
 }
 
 function isAccount(value: unknown): value is TradeAccount {
@@ -99,7 +139,7 @@ function normalize(raw: Record<string, unknown>): Trade | null {
     orderId: typeof raw.orderId === "string" ? raw.orderId : "",
     executedAt: typeof raw.executedAt === "string" ? raw.executedAt : "",
     account: isAccount(raw.account) ? raw.account : "zerodha-tr8076",
-    segment: isSegment(raw.segment) ? raw.segment : "equity",
+    segment: isSegment(raw.segment) ? raw.segment : inferSegment(raw.segment, raw.venueSegment),
     notes: typeof raw.notes === "string" ? raw.notes : "",
     source: raw.source === "file" ? "file" : "desk",
   };

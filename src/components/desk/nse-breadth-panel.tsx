@@ -122,12 +122,17 @@ export function NseBreadthPanel({
               prints (NSE primary names). Sector rows are official NSE sectoral indices.
             </CardDescription>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {loading ? <Badge variant="outline">Reading NSE</Badge> : null}
-            {data?.source === "nse" && !error ? <Badge variant="outline">NSE</Badge> : null}
-            {thrust ? <Badge variant="outline">DMA / thrust</Badge> : null}
-            {data?.source === "tradingview" ? <Badge variant="outline">TV fallback</Badge> : null}
-            {error ? <Badge variant="destructive">{error}</Badge> : null}
+          <div className="flex flex-col items-end gap-1.5">
+            <span className="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase whitespace-nowrap">
+              {data?.source === "tradingview" ? "TradingView" : "NSE · Chartink"}
+            </span>
+            <div className="flex flex-wrap justify-end gap-1.5">
+              {loading ? <Badge variant="outline">Reading NSE</Badge> : null}
+              {data?.source === "nse" && !error ? <Badge variant="outline">NSE</Badge> : null}
+              {thrust ? <Badge variant="outline">DMA / thrust</Badge> : null}
+              {data?.source === "tradingview" ? <Badge variant="outline">TV fallback</Badge> : null}
+              {error ? <Badge variant="destructive">{error}</Badge> : null}
+            </div>
           </div>
         </div>
       </CardHeader>

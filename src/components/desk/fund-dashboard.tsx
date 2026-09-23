@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { EquityChart } from "@/components/desk/equity-chart";
+import { FeedSource } from "@/components/desk/feed-source";
 import { LiveBookStrip } from "@/components/desk/live-book-strip";
 import { FUND, NAV_SERIES, POSITIONS, RISK_NOTES, SLEEVES } from "@/lib/fund/book";
 import { formatPct, formatUsd, pnlClass } from "@/lib/format";
@@ -51,9 +52,12 @@ export function FundDashboard() {
               As of {FUND.asOf}
             </p>
           </div>
-          <p className="text-muted-foreground max-w-xs text-sm leading-relaxed md:text-right">
-            Sample partner book below. Your real blotter (after costs) sits under the title.
-          </p>
+          <div className="flex flex-col items-start gap-2 md:items-end">
+            <FeedSource>Desk sample</FeedSource>
+            <p className="text-muted-foreground max-w-xs text-sm leading-relaxed md:text-right">
+              Sample partner book below. Your real blotter (after costs) sits under the title.
+            </p>
+          </div>
         </div>
       </header>
 
