@@ -194,6 +194,7 @@ export function PortfolioBlotter() {
   const [shareNote, setShareNote] = useState<string | null>(null);
   const [showShareTable, setShowShareTable] = useState(false);
   const [showSegmentShare, setShowSegmentShare] = useState(false);
+  const [showBooks, setShowBooks] = useState(true);
   const [bench, setBench] = useState<{
     nifty50: number | null;
     smallcap: number | null;
@@ -792,12 +793,24 @@ export function PortfolioBlotter() {
         </p>
       </header>
 
-      <div className="grid min-w-0 flex-1 grid-cols-1 gap-5 md:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)] md:items-start">
+      <div
+        className={
+          showBooks
+            ? "grid min-w-0 flex-1 grid-cols-1 gap-5 md:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)] md:items-start"
+            : "grid min-w-0 flex-1 grid-cols-1 gap-5 md:items-start"
+        }
+      >
+      {showBooks ? (
       <aside className="flex min-w-0 w-full flex-col gap-3 md:sticky md:top-[calc(var(--desk-nav-h,4rem)+0.75rem)] md:max-h-[calc(100vh-var(--desk-nav-h,4rem)-1.5rem)] md:overflow-y-auto">
       <section className="flex flex-col gap-3">
-        <p className="text-muted-foreground text-[11px] font-medium tracking-[0.24em] uppercase">
-          Books
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-muted-foreground text-[11px] font-medium tracking-[0.24em] uppercase">
+            Books
+          </p>
+          <Button type="button" variant="outline" size="xs" onClick={() => setShowBooks(false)}>
+            Hide
+          </Button>
+        </div>
         <div className="flex flex-col gap-2">
           <button
             type="button"
@@ -892,6 +905,7 @@ export function PortfolioBlotter() {
         </div>
       </section>
       </aside>
+      ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col gap-6">
       <div>
@@ -907,6 +921,11 @@ export function PortfolioBlotter() {
           }}
         />
         <div className="flex flex-wrap items-center gap-2">
+          {!showBooks ? (
+            <Button type="button" variant="outline" size="xs" onClick={() => setShowBooks(true)}>
+              Show books
+            </Button>
+          ) : null}
           <Button type="button" variant="outline" size="xs" disabled={importBusy} onClick={() => fileRef.current?.click()}>
             {importBusy ? "Reading…" : "Upload"}
           </Button>

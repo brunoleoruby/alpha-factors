@@ -25,6 +25,12 @@ const MACRO_BY_SECTOR: Record<string, string> = {
   "Capital Goods": "Industrials",
   Construction: "Industrials",
   Defence: "Industrials",
+  AI: "Information Technology",
+  Transformers: "Industrials",
+  "Solar energy": "Utilities",
+  "Cloud storage": "Information Technology",
+  "EV vehicles": "Consumer Discretionary",
+  Insurance: "Financial Services",
   Jewellery: "Consumer Discretionary",
   Mining: "Commodities",
   Sugar: "Fast Moving Consumer Goods",
@@ -62,6 +68,107 @@ const DEFENCE_LINE: Record<string, string> = {
   PARAS: "Space & electro-optics",
   CYIENTDLM: "Defence manufacturing",
   DYNAMATECH: "Defence manufacturing",
+};
+
+const AI_LINE: Record<string, string> = {
+  E2E: "GPU cloud",
+  NETWEB: "AI servers",
+  LATENTVIEW: "Data analytics",
+  NEWGEN: "Enterprise AI software",
+  INTELLECT: "Enterprise AI software",
+  AURIONPRO: "Enterprise AI software",
+  NUCLEUS: "Enterprise AI software",
+  RAMCOSYS: "Enterprise AI software",
+  SUBEX: "Enterprise AI software",
+  HAPPSTMNDS: "Digital / AI services",
+  PERSISTENT: "Digital / AI services",
+  MASTEK: "Digital / AI services",
+  BIRLASOFT: "Digital / AI services",
+  COFORGE: "Digital / AI services",
+  AFFLE: "AI advertising",
+  RATEGAIN: "Travel AI",
+  MAPMYINDIA: "Geospatial AI",
+  TATATECH: "Engineering software",
+  LTTS: "Engineering software",
+  KPITTECH: "Engineering software",
+  TATAELXSI: "Engineering software",
+  CYIENT: "Engineering software",
+  SASKEN: "Engineering software",
+  MOSCHIP: "Semiconductors",
+};
+
+const TRANSFORMER_LINE: Record<string, string> = {
+  TARIL: "Power transformers",
+  VOLTAMP: "Power transformers",
+  INDOTECH: "Power transformers",
+  SHILCHAR: "Power transformers",
+  MARSONS: "Distribution transformers",
+  ATLANTAELE: "Power transformers",
+  POWERINDIA: "Grid / HV equipment",
+  CGPOWER: "Grid / HV equipment",
+  SCHNEIDER: "Grid / HV equipment",
+  PITTIENG: "Laminations",
+  PRECWIRE: "Winding wire",
+};
+
+const SOLAR_LINE: Record<string, string> = {
+  ADANIGREEN: "Solar generation",
+  NTPCGREEN: "Solar generation",
+  ACMESOLAR: "Solar generation",
+  KPIGREEN: "Solar generation",
+  WAAREEENER: "Solar modules",
+  PREMIERENE: "Solar modules",
+  VIKRAMSOLR: "Solar modules",
+  EMMVEE: "Solar modules",
+  WEBELSOLAR: "Solar cells",
+  SWELECTES: "Solar modules",
+  BORORENEW: "Solar glass",
+  SWSOLAR: "Solar EPC",
+  GENSOL: "Solar EPC",
+  UJAAS: "Solar generation",
+  SURANASOL: "Solar modules",
+  SAATVIK: "Solar modules",
+};
+
+const CLOUD_LINE: Record<string, string> = {
+  SIFY: "Data centres",
+  ANANTRAJ: "Data centres",
+  TATACOMM: "Cloud connectivity",
+  RAILTEL: "Cloud connectivity",
+  BBOX: "Digital infrastructure",
+  ITI: "Digital infrastructure",
+  INFOBEAN: "Cloud software",
+  DATAMATICS: "Cloud software",
+};
+
+const EV_LINE: Record<string, string> = {
+  OLAELEC: "Electric two-wheelers",
+  ATHERENERG: "Electric two-wheelers",
+  OLECTRA: "Electric buses",
+  JBMA: "Electric buses",
+  ATULAUTO: "Electric three-wheelers",
+  GREAVESCOT: "Electric last-mile",
+  EXICOM: "EV charging",
+  SERVOTECH: "EV charging",
+  "ARE&M": "EV batteries",
+  HBLENGINE: "EV batteries",
+  HBLPOWER: "EV batteries",
+};
+
+const INSURANCE_LINE: Record<string, string> = {
+  LICI: "Life insurance",
+  HDFCLIFE: "Life insurance",
+  SBILIFE: "Life insurance",
+  ICICIPRULI: "Life insurance",
+  MFSL: "Life insurance",
+  CANHLIFE: "Life insurance",
+  ICICIGI: "General insurance",
+  NIACL: "General insurance",
+  GODIGIT: "General insurance",
+  STARHEALTH: "Health insurance",
+  NIVABUPA: "Health insurance",
+  GICRE: "Reinsurance",
+  POLICYBZR: "Insurance distribution",
 };
 
 const JEWELLERY_LINE: Record<string, string> = {
@@ -117,6 +224,12 @@ const SUGAR_LINE: Record<string, string> = {
 
 export const THEME_INDEXES = [
   { industry: "Defence", id: "ec-defence-15", name: "EC Defence 15" },
+  { industry: "AI", id: "ec-ai-15", name: "EC AI 15" },
+  { industry: "Transformers", id: "ec-transformers-15", name: "EC Transformers 15" },
+  { industry: "Solar energy", id: "ec-solar-15", name: "EC Solar 15" },
+  { industry: "Cloud storage", id: "ec-cloud-storage-15", name: "EC Cloud storage 15" },
+  { industry: "EV vehicles", id: "ec-ev-15", name: "EC EV 15" },
+  { industry: "Insurance", id: "ec-insurance-15", name: "EC Insurance 15" },
   { industry: "Jewellery", id: "ec-jewellery-15", name: "EC Jewellery 15" },
   { industry: "Mining", id: "ec-mining-15", name: "EC Mining 15" },
   { industry: "Sugar", id: "ec-sugar-15", name: "EC Sugar 15" },
@@ -145,6 +258,138 @@ function defenceLine(symbol: string, name: string, tvIndustry: string) {
   if (/space|optic/.test(t)) return "Space & electro-optics";
   if (/beml|vehicle|earth.?moving/.test(t)) return "Land systems";
   return "Defence manufacturing";
+}
+
+function isAI(symbol: string, name: string, tvIndustry: string) {
+  const sym = symbol.toUpperCase();
+  if (AI_LINE[sym]) return true;
+  const t = `${tvIndustry} ${name}`.toLowerCase();
+  if (/tcs|infosys|wipro|hcl tech|tech mahindra/.test(t)) return false;
+  return /artificial intelligence|machine learning|generative ai|gpu cloud|data analytics|geospatial/.test(t);
+}
+
+function aiLine(symbol: string, name: string, tvIndustry: string) {
+  const mapped = AI_LINE[symbol.toUpperCase()];
+  if (mapped) return mapped;
+  const t = `${tvIndustry} ${name} ${symbol}`.toLowerCase();
+  if (/gpu|supercomput|hpc|server/.test(t)) return "AI servers";
+  if (/cloud|data cent/.test(t)) return "GPU cloud";
+  if (/analytic/.test(t)) return "Data analytics";
+  if (/advert|adtech|digital marketing/.test(t)) return "AI advertising";
+  if (/travel|hospitality/.test(t)) return "Travel AI";
+  if (/map|geo/.test(t)) return "Geospatial AI";
+  if (/semiconductor|chip/.test(t)) return "Semiconductors";
+  if (/elxsi|kpit|ltts|cyient|sasken|tata tech/.test(t)) return "Engineering software";
+  if (/intellect|newgen|aurion|nucleus|ramco|subex/.test(t)) return "Enterprise AI software";
+  return "Digital / AI services";
+}
+
+function isTransformer(symbol: string, name: string, tvIndustry: string) {
+  const sym = symbol.toUpperCase();
+  if (TRANSFORMER_LINE[sym]) return true;
+  const t = `${tvIndustry} ${name}`.toLowerCase();
+  if (/siemens|\babb\b|bhel|havells|polycab|\bkei\b|finolex|crompton|v-guard|vguard/.test(t)) {
+    return false;
+  }
+  return /\btransformers?\b/.test(t);
+}
+
+function transformerLine(symbol: string, name: string, tvIndustry: string) {
+  const mapped = TRANSFORMER_LINE[symbol.toUpperCase()];
+  if (mapped) return mapped;
+  const t = `${tvIndustry} ${name} ${symbol}`.toLowerCase();
+  if (/lamination|stamp/.test(t)) return "Laminations";
+  if (/winding|wire|enamel/.test(t)) return "Winding wire";
+  if (/hitachi|grid|hvdc|switchgear|t&d|transmission/.test(t)) return "Grid / HV equipment";
+  if (/distribution/.test(t)) return "Distribution transformers";
+  return "Power transformers";
+}
+
+function isSolar(symbol: string, name: string, tvIndustry: string) {
+  const sym = symbol.toUpperCase();
+  if (SOLAR_LINE[sym]) return true;
+  const t = `${tvIndustry} ${name}`.toLowerCase();
+  if (/suzlon|inox.?wind|solar industries|tata power|\bntpc\b(?! green)|reliance/.test(t)) {
+    return false;
+  }
+  return /\bsolar\b|photovoltaic|pv module/.test(t);
+}
+
+function solarLine(symbol: string, name: string, tvIndustry: string) {
+  const mapped = SOLAR_LINE[symbol.toUpperCase()];
+  if (mapped) return mapped;
+  const t = `${tvIndustry} ${name} ${symbol}`.toLowerCase();
+  if (/glass|borosil/.test(t)) return "Solar glass";
+  if (/epc|sterling|wilson|gensol/.test(t)) return "Solar EPC";
+  if (/\bcell\b|wafer/.test(t)) return "Solar cells";
+  if (/module|panel|waaree|premier|vikram/.test(t)) return "Solar modules";
+  if (/green energy|ipp|generation|power/.test(t)) return "Solar generation";
+  return "Solar modules";
+}
+
+function isCloud(symbol: string, name: string, tvIndustry: string) {
+  const sym = symbol.toUpperCase();
+  if (CLOUD_LINE[sym]) return true;
+  const t = `${tvIndustry} ${name}`.toLowerCase();
+  if (/tcs|infosys|wipro|hcl tech|tech mahindra|bharti|indus tower/.test(t)) return false;
+  return /data.?cent|colocation|co-location|cloud storage|cloud infrastruct/.test(t);
+}
+
+function cloudLine(symbol: string, name: string, tvIndustry: string) {
+  const mapped = CLOUD_LINE[symbol.toUpperCase()];
+  if (mapped) return mapped;
+  const t = `${tvIndustry} ${name} ${symbol}`.toLowerCase();
+  if (/data.?cent|colocation|anant raj/.test(t)) return "Data centres";
+  if (/rail.?tel|tata comm|connectivity|network/.test(t)) return "Cloud connectivity";
+  if (/software|saas/.test(t)) return "Cloud software";
+  return "Digital infrastructure";
+}
+
+function isEv(symbol: string, name: string, tvIndustry: string) {
+  const sym = symbol.toUpperCase();
+  if (EV_LINE[sym]) return true;
+  const t = `${tvIndustry} ${name}`.toLowerCase();
+  if (
+    /maruti|tata motors|mahindra & mahindra|hero motocorp|tvs motor|bajaj auto|eicher|ashok leyland|bosch/.test(
+      t,
+    )
+  ) {
+    return false;
+  }
+  return /electric vehicle|\be-bus\b|e-scooter|ola electric|ather energy|olectra|ev charging/.test(t);
+}
+
+function evLine(symbol: string, name: string, tvIndustry: string) {
+  const mapped = EV_LINE[symbol.toUpperCase()];
+  if (mapped) return mapped;
+  const t = `${tvIndustry} ${name} ${symbol}`.toLowerCase();
+  if (/charg|exicom|servotech/.test(t)) return "EV charging";
+  if (/batter|cell|amara raja|hbl/.test(t)) return "EV batteries";
+  if (/bus|olectra|jbm/.test(t)) return "Electric buses";
+  if (/three.?wheel|3w|atul/.test(t)) return "Electric three-wheelers";
+  if (/last.?mile|greaves/.test(t)) return "Electric last-mile";
+  return "Electric two-wheelers";
+}
+
+function isInsurance(symbol: string, name: string, tvIndustry: string) {
+  const sym = symbol.toUpperCase();
+  if (INSURANCE_LINE[sym]) return true;
+  const t = `${tvIndustry} ${name}`.toLowerCase();
+  if (/max healthcare|hospital|bajaj finserv|hdfc bank|icici bank/.test(t)) return false;
+  return /life insurance|general insurance|health insurance|reinsurance|\binsurer\b|insurance corporation/.test(
+    t,
+  );
+}
+
+function insuranceLine(symbol: string, name: string, tvIndustry: string) {
+  const mapped = INSURANCE_LINE[symbol.toUpperCase()];
+  if (mapped) return mapped;
+  const t = `${tvIndustry} ${name} ${symbol}`.toLowerCase();
+  if (/reinsur|gic/.test(t)) return "Reinsurance";
+  if (/bazaar|policyb|broker|distribution|fintech/.test(t)) return "Insurance distribution";
+  if (/health|star|niva|bupa/.test(t)) return "Health insurance";
+  if (/general|non.?life|gic of|new india|digit/.test(t)) return "General insurance";
+  return "Life insurance";
 }
 
 function isJewellery(symbol: string, name: string, tvIndustry: string) {
@@ -198,6 +443,12 @@ function sugarLine(symbol: string, name: string, tvIndustry: string) {
 
 function themeIndustryOf(symbol: string, name: string, tvIndustry: string, iics: string) {
   if (isDefence(symbol, name, tvIndustry)) return "Defence";
+  if (isAI(symbol, name, tvIndustry)) return "AI";
+  if (isTransformer(symbol, name, tvIndustry)) return "Transformers";
+  if (isSolar(symbol, name, tvIndustry)) return "Solar energy";
+  if (isCloud(symbol, name, tvIndustry)) return "Cloud storage";
+  if (isEv(symbol, name, tvIndustry)) return "EV vehicles";
+  if (isInsurance(symbol, name, tvIndustry)) return "Insurance";
   if (isJewellery(symbol, name, tvIndustry)) return "Jewellery";
   if (isMining(symbol, name, tvIndustry)) return "Mining";
   if (isSugar(symbol, name, tvIndustry)) return "Sugar";
@@ -308,6 +559,12 @@ async function fetchTotalMarket() {
 function basicIndustry(tvIndustry: string, iicsSector: string, name = "", symbol = "") {
   const t = `${tvIndustry} ${name} ${symbol}`.toLowerCase();
   if (iicsSector === "Defence") return defenceLine(symbol, name, tvIndustry);
+  if (iicsSector === "AI") return aiLine(symbol, name, tvIndustry);
+  if (iicsSector === "Transformers") return transformerLine(symbol, name, tvIndustry);
+  if (iicsSector === "Solar energy") return solarLine(symbol, name, tvIndustry);
+  if (iicsSector === "Cloud storage") return cloudLine(symbol, name, tvIndustry);
+  if (iicsSector === "EV vehicles") return evLine(symbol, name, tvIndustry);
+  if (iicsSector === "Insurance") return insuranceLine(symbol, name, tvIndustry);
   if (iicsSector === "Jewellery") return jewelleryLine(symbol, name, tvIndustry);
   if (iicsSector === "Mining") return miningLine(symbol, name, tvIndustry);
   if (iicsSector === "Sugar") return sugarLine(symbol, name, tvIndustry);

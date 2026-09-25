@@ -132,7 +132,7 @@ export function SectorAnalysis() {
               {tab === "performance"
                 ? `Live book uses 6-month skip-month momentum, a 12-month index gate, and a VIX overlay. History below is total return from ${SECTOR_START} to ${SECTOR_AS_OF}.`
                 : market === "NSE"
-                  ? "NSE Indices classifies a name by the business that earns more than half of revenue. Defence, Jewellery, Mining, and Sugar are split first, then the rest of the book."
+                  ? "NSE Indices classifies a name by the business that earns more than half of revenue. Defence, AI, Transformers, Solar energy, Cloud storage, EV vehicles, Insurance, Jewellery, Mining, and Sugar are split first, then the rest of the book."
                   : "SPDR / GICS names in this book. Proxy is the ETF used for the tape."}
             </p>
           </div>

@@ -2,92 +2,135 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatPct, pnlClass } from "@/lib/format";
-import {
-  breadthTone,
-  type BreadthSlice,
-  type MaTape,
-  type NseBreadth,
-} from "@/lib/markets/nse-breadth";
+import { formatDate } from "@/lib/format";
+import { type BreadthDay, type NseBreadth } from "@/lib/markets/nse-breadth";
 import { cn } from "cn";
 
-function share(n: number, total: number) {
-  if (total <= 0) return 0;
-  return (n / total) * 100;
+const COUNT = new Intl.NumberFormat("en-IN");
+
+function toneClass(tone?: "gain" | "loss") {
+  if (tone === "gain") return "[color:oklch(0.62_0.2_145)]";
+  if (tone === "loss") return "[color:oklch(0.62_0.22_25)]";
+  return "text-muted-foreground";
 }
 
-function AdBar({ row }: { row: BreadthSlice }) {
-  const a = share(row.advances, row.total);
-  const u = share(row.unchanged, row.total);
-  const d = share(row.declines, row.total);
+function toneFill(tone?: "gain" | "loss") {
+  if (tone === "gain") return "bg-[oklch(0.62_0.2_145/0.12)]";
+  if (tone === "loss") return "bg-[oklch(0.62_0.22_25/0.12)]";
+  return "";
+}
+
+function BreadthChart({
+  title,
+  rows,
+  aboveKey,
+  belowKey,
+  aboveLabel,
+  belowLabel,
+}: {
+  title: string;
+  rows: BreadthDay[];
+  aboveKey: keyof BreadthDay;
+  belowKey: keyof BreadthDay;
+  aboveLabel: string;
+  belowLabel: string;
+}) {
+  const series = [...rows].reverse();
+  const w = 420;
+  const h = 180;
+  const pad = { l: 36, r: 8, t: 12, b: 22 };
+  const vals = series.flatMap((r) => [Number(r[aboveKey]), Number(r[belowKey])]);
+  const max = Math.max(1, ...vals);
+  const innerW = w - pad.l - pad.r;
+  const innerH = h - pad.t - pad.b;
+  const x = (i: number) => pad.l + (series.length <= 1 ? innerW / 2 : (i / (series.length - 1)) * innerW);
+  const y = (v: number) => pad.t + innerH - (v / max) * innerH;
+  function path(key: keyof BreadthDay) {
+    return series
+      .map((row, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)} ${y(Number(row[key])).toFixed(1)}`)
+      .join(" ");
+  }
   return (
-    <div className="bg-muted flex h-2 w-full overflow-hidden rounded-full">
-      <div className="bg-gain h-full" style={{ width: `${a}%` }} />
-      <div className="bg-muted-foreground/30 h-full" style={{ width: `${u}%` }} />
-      <div className="bg-loss h-full" style={{ width: `${d}%` }} />
+    <div className="min-w-0">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-muted-foreground font-mono text-[10px]">
+          <span className={toneClass("gain")}>{aboveLabel}</span>
+          {" · "}
+          <span className={toneClass("loss")}>{belowLabel}</span>
+        </p>
+      </div>
+      {series.length < 2 ? (
+        <p className="text-muted-foreground text-xs">Need two sessions to plot.</p>
+      ) : (
+        <svg viewBox={`0 0 ${w} ${h}`} className="h-[180px] w-full" role="img" aria-label={title}>
+          <path d={path(aboveKey)} fill="none" stroke="oklch(0.62 0.2 145)" strokeWidth="1.75" />
+          <path d={path(belowKey)} fill="none" stroke="oklch(0.62 0.22 25)" strokeWidth="1.75" />
+        </svg>
+      )}
     </div>
   );
 }
 
-function MaBar({ tape }: { tape: MaTape }) {
-  const a = share(tape.above, tape.total);
-  const b = share(tape.below, tape.total);
+function GroupHead({ label, span, first }: { label: string; span: number; first?: boolean }) {
   return (
-    <div className="bg-muted flex h-2 w-full overflow-hidden rounded-full">
-      <div className="bg-gain h-full" style={{ width: `${a}%` }} />
-      <div className="bg-loss h-full" style={{ width: `${b}%` }} />
-    </div>
+    <th
+      colSpan={span}
+      scope="colgroup"
+      className={cn(
+        "text-foreground/85 sticky top-0 z-20 border-b bg-card px-3 py-1.5 text-center text-[10px] font-semibold tracking-[0.14em] uppercase",
+        !first && "border-l border-border/70",
+      )}
+    >
+      {label}
+    </th>
   );
 }
 
-function Stat({ label, value, className }: { label: string; value: string; className?: string }) {
+function ColHead({
+  label,
+  tone,
+  first,
+}: {
+  label: string;
+  tone?: "gain" | "loss";
+  first?: boolean;
+}) {
   return (
-    <div>
-      <p className="text-muted-foreground text-[10px] tracking-[0.16em] uppercase">{label}</p>
-      <p className={cn("font-mono text-lg font-semibold tabular-nums", className)}>{value}</p>
-    </div>
+    <th
+      scope="col"
+      className={cn(
+        "sticky top-[1.85rem] z-10 whitespace-nowrap px-3 py-2 text-right text-[11px] font-semibold",
+        !first && "border-l border-border/40",
+        toneClass(tone),
+        tone ? toneFill(tone) : "bg-card",
+      )}
+    >
+      {label}
+    </th>
   );
 }
 
-function SliceTable({ rows, nameLabel }: { rows: BreadthSlice[]; nameLabel: string }) {
+function CountCell({
+  n,
+  tone,
+  groupStart,
+}: {
+  n: number;
+  tone?: "gain" | "loss";
+  groupStart?: boolean;
+}) {
   return (
-    <table className="w-full min-w-[32rem] border-separate border-spacing-0 text-left text-sm">
-      <thead>
-        <tr className="text-muted-foreground border-b text-[10px] tracking-[0.16em] uppercase">
-          <th className="pb-2 pr-3 font-medium">{nameLabel}</th>
-          <th className="pb-2 pr-2 text-right font-medium">Adv</th>
-          <th className="pb-2 pr-2 text-right font-medium">Dec</th>
-          <th className="pb-2 pr-3 text-right font-medium">Unch</th>
-          <th className="min-w-[6rem] pb-2 pr-3 font-medium">Breadth</th>
-          <th className="pb-2 text-right font-medium">Day</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row.id} className="border-border/50 border-b last:border-0">
-            <td className="py-1.5 pr-3">
-              <p className="font-medium">{row.name}</p>
-            </td>
-            <td className="text-gain py-1.5 pr-2 text-right font-mono tabular-nums">{row.advances}</td>
-            <td className="text-loss py-1.5 pr-2 text-right font-mono tabular-nums">{row.declines}</td>
-            <td className="text-muted-foreground py-1.5 pr-3 text-right font-mono tabular-nums">
-              {row.unchanged}
-            </td>
-            <td className="min-w-[6rem] py-1.5 pr-3">
-              <AdBar row={row} />
-            </td>
-            <td
-              className={cn(
-                "py-1.5 text-right font-mono text-[11px] whitespace-nowrap tabular-nums",
-                row.changePct != null ? pnlClass(row.changePct) : "text-muted-foreground",
-              )}
-            >
-              {row.changePct != null ? formatPct(row.changePct) : "—"}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <td
+      className={cn(
+        "px-3 py-2 text-right font-mono text-sm font-semibold tabular-nums",
+        groupStart && "border-l border-border/40",
+        toneClass(tone),
+        toneFill(tone),
+      )}
+    >
+      {COUNT.format(n)}
+    </td>
   );
 }
 
@@ -100,150 +143,156 @@ export function NseBreadthPanel({
   loading: boolean;
   error: string | null;
 }) {
-  const ex = data?.exchange;
-  const tone = breadthTone(ex?.advanceShare ?? null);
-  const ad =
-    ex && ex.declines > 0 ? ex.advances / ex.declines : ex && ex.advances > 0 ? Infinity : null;
-  const mas = [
-    data?.movingAverages?.dma20,
-    data?.movingAverages?.dma50,
-    data?.movingAverages?.dma200,
-  ].filter((t): t is MaTape => t != null);
-  const thrust = data?.thrust;
+  const history = data?.history ?? [];
+  const liveDate = history[0]?.date;
 
   return (
     <Card className="border-primary/15 bg-card/90">
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <CardTitle className="text-base leading-tight">NSE market breadth</CardTitle>
-            <CardDescription className="text-xs">
-              Exchange A/D from NSE Total Market. Thrust and 20/50/200 DMA are the Chartink Atlas
-              prints (NSE primary names). Sector rows are official NSE sectoral indices.
-            </CardDescription>
+            <CardTitle className="text-base leading-tight">Market breadth</CardTitle>
+            <CardDescription className="text-xs">NSE names — one row per session.</CardDescription>
           </div>
-          <div className="flex flex-col items-end gap-1.5">
-            <span className="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase whitespace-nowrap">
-              {data?.source === "tradingview" ? "TradingView" : "NSE · Chartink"}
-            </span>
-            <div className="flex flex-wrap justify-end gap-1.5">
-              {loading ? <Badge variant="outline">Reading NSE</Badge> : null}
-              {data?.source === "nse" && !error ? <Badge variant="outline">NSE</Badge> : null}
-              {thrust ? <Badge variant="outline">DMA / thrust</Badge> : null}
-              {data?.source === "tradingview" ? <Badge variant="outline">TV fallback</Badge> : null}
-              {error ? <Badge variant="destructive">{error}</Badge> : null}
-            </div>
+          <div className="flex flex-wrap justify-end gap-1.5">
+            {loading ? <Badge variant="outline">Reading</Badge> : null}
+            {history.length ? (
+              <Badge variant="outline">
+                {history.length} session{history.length === 1 ? "" : "s"} stored
+              </Badge>
+            ) : null}
+            {error ? <Badge variant="destructive">{error}</Badge> : null}
           </div>
         </div>
       </CardHeader>
       <CardContent className="grid gap-6 pt-0">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
-          <div>
-            {loading && !ex ? (
-              <p className="text-muted-foreground text-sm">…</p>
-            ) : !ex ? (
-              <p className="text-muted-foreground text-sm">No exchange print yet.</p>
-            ) : (
-              <>
-                <p className="text-muted-foreground mb-1 text-[10px] tracking-[0.18em] uppercase">
-                  {ex.name} · {ex.total} names
-                </p>
-                <p
-                  className={cn(
-                    "font-heading text-2xl font-semibold",
-                    tone === "gain" ? "text-gain" : tone === "loss" ? "text-loss" : "text-foreground",
-                  )}
+        <div className="border-border/60 max-h-[28rem] overflow-auto rounded-lg border">
+          <table className="w-full min-w-[64rem] border-collapse text-sm">
+            <caption className="sr-only">
+              Market breadth by date: names up or down 4.5% today, up or down 20% in five days, and above or
+              below the 20, 50, and 200 day moving averages.
+            </caption>
+            <colgroup>
+              <col className="w-[8.5rem]" />
+              <col span={2} />
+              <col span={2} />
+              <col span={2} />
+              <col span={2} />
+              <col span={2} />
+            </colgroup>
+            <thead>
+              <tr className="bg-card">
+                <th
+                  rowSpan={2}
+                  scope="col"
+                  className="sticky top-0 left-0 z-30 border-b bg-card px-3 py-2 text-left text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
                 >
-                  {ex.advanceShare != null ? `${(ex.advanceShare * 100).toFixed(1)}%` : "—"} advancing
-                </p>
-                <div className="mt-3">
-                  <AdBar row={ex} />
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <Stat label="Advances" value={String(ex.advances)} className="text-gain" />
-                  <Stat label="Declines" value={String(ex.declines)} className="text-loss" />
-                  <Stat label="Unchanged" value={String(ex.unchanged)} />
-                  <Stat
-                    label="A / D"
-                    value={ad == null ? "—" : Number.isFinite(ad) ? ad.toFixed(2) : "∞"}
-                  />
-                </div>
-                {data?.week52High != null || data?.week52Low != null ? (
-                  <p className="text-muted-foreground mt-3 font-mono text-[11px]">
-                    52-week high {data.week52High ?? "—"} · 52-week low {data.week52Low ?? "—"}
-                  </p>
-                ) : null}
-                {ex.changePct != null ? (
-                  <p className={cn("mt-1 font-mono text-[11px]", pnlClass(ex.changePct))}>
-                    Index {formatPct(ex.changePct)}
-                  </p>
-                ) : null}
-              </>
-            )}
-          </div>
-          <div className="overflow-x-auto">
-            <SliceTable rows={data?.indices ?? []} nameLabel="Index" />
-            {!loading && data && data.indices.length === 0 ? (
-              <p className="text-muted-foreground mt-2 text-xs">
-                Index rows need the NSE feed. Exchange count above is the fallback tape.
-              </p>
-            ) : null}
-          </div>
+                  Date
+                </th>
+                <GroupHead label="Today" span={2} first />
+                <GroupHead label="5 days" span={2} />
+                <GroupHead label="20 DMA" span={2} />
+                <GroupHead label="50 DMA" span={2} />
+                <GroupHead label="200 DMA" span={2} />
+              </tr>
+              <tr className="bg-card">
+                <ColHead label="Up 4.5%+" tone="gain" first />
+                <ColHead label="Down 4.5%+" tone="loss" />
+                <ColHead label="Up 20%+" tone="gain" first />
+                <ColHead label="Down 20%+" tone="loss" />
+                <ColHead label="Above" tone="gain" first />
+                <ColHead label="Below" tone="loss" />
+                <ColHead label="Above" tone="gain" first />
+                <ColHead label="Below" tone="loss" />
+                <ColHead label="Above" tone="gain" first />
+                <ColHead label="Below" tone="loss" />
+              </tr>
+            </thead>
+            <tbody>
+              {loading && !history.length ? (
+                <tr>
+                  <td className="text-muted-foreground px-3 py-4" colSpan={11}>
+                    Reading market breadth…
+                  </td>
+                </tr>
+              ) : !history.length ? (
+                <tr>
+                  <td className="text-muted-foreground px-3 py-4" colSpan={11}>
+                    No breadth rows yet.
+                  </td>
+                </tr>
+              ) : (
+                history.slice(0, 40).map((row, i) => {
+                  const live = row.date === liveDate;
+                  return (
+                    <tr
+                      key={row.date}
+                      className={cn(
+                        "border-border/50 border-b last:border-0",
+                        i % 2 === 1 && "bg-foreground/[0.03]",
+                        live && "bg-primary/8",
+                      )}
+                    >
+                      <th
+                        scope="row"
+                        className={cn(
+                          "sticky left-0 z-20 bg-card px-3 py-2 text-left font-mono text-xs font-medium tabular-nums",
+                          live && "bg-primary/8",
+                        )}
+                      >
+                        <span className="flex items-center gap-2">
+                          {formatDate(row.date)}
+                          {live ? (
+                            <span className="text-primary text-[9px] font-semibold tracking-[0.12em] uppercase">
+                              Live
+                            </span>
+                          ) : null}
+                        </span>
+                      </th>
+                      <CountCell n={row.up45} tone="gain" />
+                      <CountCell n={row.down45} tone="loss" />
+                      <CountCell n={row.up5d20} tone="gain" groupStart />
+                      <CountCell n={row.down5d20} tone="loss" />
+                      <CountCell n={row.above20} tone="gain" groupStart />
+                      <CountCell n={row.below20} tone="loss" />
+                      <CountCell n={row.above50} tone="gain" groupStart />
+                      <CountCell n={row.below50} tone="loss" />
+                      <CountCell n={row.above200} tone="gain" groupStart />
+                      <CountCell n={row.below200} tone="loss" />
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
 
-        {thrust ? (
-          <div>
-            <p className="text-muted-foreground mb-2 text-[10px] tracking-[0.18em] uppercase">
-              Thrust · {thrust.universe.toLocaleString("en-IN")} NSE names
-            </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Stat label="Up 4.5%+ today" value={String(thrust.up45)} className="text-gain" />
-              <Stat label="Down 4.5%+ today" value={String(thrust.down45)} className="text-loss" />
-              <Stat label="Up 20%+ in 5d" value={String(thrust.up5d20)} className="text-gain" />
-              <Stat label="Down 20%+ in 5d" value={String(thrust.down5d20)} className="text-loss" />
-            </div>
-          </div>
-        ) : null}
-
-        {mas.length ? (
-          <div className="grid gap-3 md:grid-cols-3">
-            {mas.map((tape) => (
-              <div key={tape.label}>
-                <div className="mb-1 flex items-baseline justify-between gap-2">
-                  <p className="text-muted-foreground text-[10px] tracking-[0.16em] uppercase">
-                    Above {tape.label}
-                  </p>
-                  <p
-                    className={cn(
-                      "font-mono text-sm tabular-nums",
-                      breadthTone(tape.aboveShare) === "gain"
-                        ? "text-gain"
-                        : breadthTone(tape.aboveShare) === "loss"
-                          ? "text-loss"
-                          : "text-foreground",
-                    )}
-                  >
-                    {tape.aboveShare != null ? `${(tape.aboveShare * 100).toFixed(1)}%` : "—"}
-                    <span className="text-muted-foreground">
-                      {" "}
-                      {tape.above}/{tape.below}
-                    </span>
-                  </p>
-                </div>
-                <MaBar tape={tape} />
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {(data?.sectors?.length ?? 0) > 0 ? (
-          <div className="overflow-x-auto">
-            <p className="text-muted-foreground mb-2 text-[10px] tracking-[0.18em] uppercase">
-              Sector breadth
-            </p>
-            <SliceTable rows={data?.sectors ?? []} nameLabel="Sector" />
-          </div>
-        ) : null}
+        <div className="grid gap-6 md:grid-cols-3">
+          <BreadthChart
+            title="Nifty market breadth"
+            rows={history}
+            aboveKey="above20"
+            belowKey="below20"
+            aboveLabel="above 20ema"
+            belowLabel="below 20ema"
+          />
+          <BreadthChart
+            title="Nifty market breadth"
+            rows={history}
+            aboveKey="above50"
+            belowKey="below50"
+            aboveLabel="above 50ema"
+            belowLabel="below 50ema"
+          />
+          <BreadthChart
+            title="Nifty market breadth"
+            rows={history}
+            aboveKey="above200"
+            belowKey="below200"
+            aboveLabel="above 200ema"
+            belowLabel="below 200ema"
+          />
+        </div>
       </CardContent>
     </Card>
   );

@@ -36,7 +36,8 @@ yarn-error.log*
 /data/positions.json
 /data/positions.json.tmp
 /data/timeframe-notes.json
-/data/timeframe-notes.json.tmp
+/data/market-breadth-history.json
+/data/market-breadth-history.json.tmp
 /data/imports/*
 !/data/imports/.gitkeep
 

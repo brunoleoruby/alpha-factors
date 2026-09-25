@@ -12,6 +12,12 @@ type Level = "sector" | "industry" | "basic";
 
 const THEME_PILLS = [
   { industry: "Defence", sector: "Industrials", label: "Defence 15" },
+  { industry: "AI", sector: "Information Technology", label: "AI 15" },
+  { industry: "Transformers", sector: "Industrials", label: "Transformers 15" },
+  { industry: "Solar energy", sector: "Utilities", label: "Solar energy 15" },
+  { industry: "Cloud storage", sector: "Information Technology", label: "Cloud storage 15" },
+  { industry: "EV vehicles", sector: "Consumer Discretionary", label: "EV vehicles 15" },
+  { industry: "Insurance", sector: "Financial Services", label: "Insurance 15" },
   { industry: "Jewellery", sector: "Consumer Discretionary", label: "Jewellery 15" },
   { industry: "Mining", sector: "Commodities", label: "Mining 15" },
   { industry: "Sugar", sector: "Fast Moving Consumer Goods", label: "Sugar 15" },
@@ -128,7 +134,7 @@ export function SectorIndiaMcap() {
           </h2>
           <p className="text-muted-foreground mt-2 max-w-2xl text-xs leading-relaxed">
             {book
-              ? `NSE Indices IICS on ${book.universe}: a name sits in the sector that earns more than half of revenue (else Diversified). Defence, Jewellery, Mining, and Sugar are classified on their own first. Then Healthcare → Hospital (treatment), Diagnostic, Pharmaceuticals. ${book.sectors} macro · ${book.industries} sectors · ${book.basics} basic industries · ${book.names} names.`
+              ? `NSE Indices IICS on ${book.universe}: a name sits in the sector that earns more than half of revenue (else Diversified). Defence, AI, Transformers, Solar energy, Cloud storage, EV vehicles, Insurance, Jewellery, Mining, and Sugar are classified on their own first. Then Healthcare → Hospital (treatment), Diagnostic, Pharmaceuticals. ${book.sectors} macro · ${book.industries} sectors · ${book.basics} basic industries · ${book.names} names.`
               : "Classified by major revenue, then the specific line (treatment, diagnostic, and so on)."}
           </p>
         </div>

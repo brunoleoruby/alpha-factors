@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { flushSync } from "react-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FeedSource } from "@/components/desk/feed-source";
 import { IndexBehaviorPopup, type BehaviorPayload } from "@/components/desk/index-behavior-popup";
 import { PreviousCloseCard, TodayInsightCard } from "@/components/desk/environment-share-card";
 import { NseBreadthPanel } from "@/components/desk/nse-breadth-panel";
 import { formatPct, formatSigned, pnlClass } from "@/lib/format";
 import { ENV_COLUMNS, type EnvInstrument, type EnvQuote } from "@/lib/markets/environment";
+import { loadLocalBreadth, mergeBreadthRows, saveLocalBreadth } from "@/lib/markets/breadth-days";
 import type { NseBreadth } from "@/lib/markets/nse-breadth";
 import {
   ENV_SHARE_NOTE_KEY,
@@ -200,16 +201,47 @@ export function MarketEnvironment() {
 
   useEffect(() => {
     let dead = false;
+    const persistHistory = async (history: NseBreadth["history"], diskLen: number) => {
+      saveLocalBreadth(history);
+      if (history.length <= diskLen) return;
+      await fetch("/api/environment/breadth", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: history }),
+      });
+    };
     const loadBreadth = async () => {
+      const local = loadLocalBreadth();
       try {
         const res = await fetch("/api/environment/breadth", { cache: "no-store" });
         const body = (await res.json()) as NseBreadth & { error?: string };
-        if (!res.ok && !body.exchange) throw new Error(body.error ?? `Breadth ${res.status}`);
+        if (!res.ok && !body.exchange && !(body.history?.length)) {
+          throw new Error(body.error ?? `Breadth ${res.status}`);
+        }
         if (dead) return;
-        setBreadth(body);
+        const history = mergeBreadthRows(body.history ?? [], local);
+        setBreadth({ ...body, history });
         setBreadthError(body.error ?? null);
+        void persistHistory(history, body.history?.length ?? 0);
       } catch (err) {
-        if (!dead) setBreadthError(err instanceof Error ? err.message : "NSE breadth down");
+        if (dead) return;
+        if (local.length) {
+          setBreadth((prev) => ({
+            asOf: prev?.asOf ?? new Date().toISOString(),
+            source: prev?.source ?? "tradingview",
+            exchange: prev?.exchange ?? null,
+            indices: prev?.indices ?? [],
+            sectors: prev?.sectors ?? [],
+            movingAverages: prev?.movingAverages ?? { dma20: null, dma50: null, dma200: null },
+            thrust: prev?.thrust ?? null,
+            week52High: prev?.week52High ?? null,
+            week52Low: prev?.week52Low ?? null,
+            usa: prev?.usa ?? { nyse: null, nasdaq: null, combined: null },
+            history: local,
+            error: prev?.error,
+          }));
+        }
+        setBreadthError(err instanceof Error ? err.message : "NSE breadth down");
       } finally {
         if (!dead) setBreadthLoading(false);
       }
@@ -316,11 +348,6 @@ export function MarketEnvironment() {
           </div>
           <FeedSource>Yahoo · NSE · Chartink</FeedSource>
         </div>
-        <p className="text-muted-foreground mt-2 max-w-3xl text-sm leading-relaxed">
-          Six columns, nothing mixed: Indian indices, USA indices, Asia indices, commodity, currency, and
-          crude oil. NSE exchange breadth sits under the tape. Click a ticker for the tape-rhyme popup —
-          same method as the news desk. Delayed prints.
-        </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
           {loading ? <Badge variant="outline">Loading tape</Badge> : null}
           {feed ? (
@@ -332,6 +359,8 @@ export function MarketEnvironment() {
         </div>
       </header>
 
+      <NseBreadthPanel data={breadth} loading={breadthLoading} error={breadthError} />
+
       <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
         <div className="grid min-w-[72rem] grid-cols-6 gap-3">
           {ENV_COLUMNS.map((col) => (
@@ -341,7 +370,6 @@ export function MarketEnvironment() {
                 <CardAction>
                   <FeedSource>{col.source}</FeedSource>
                 </CardAction>
-                <CardDescription className="text-xs">{col.blurb}</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
                 {col.rows.map((row) => (
@@ -358,8 +386,6 @@ export function MarketEnvironment() {
           ))}
         </div>
       </div>
-
-      <NseBreadthPanel data={breadth} loading={breadthLoading} error={breadthError} />
 
       <section className="mt-2 max-w-[940px]">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">

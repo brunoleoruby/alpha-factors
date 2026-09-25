@@ -1,3 +1,5 @@
+import { liveBreadthDay, mergeBreadthDay } from "@/lib/markets/breadth-history";
+
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -33,6 +35,20 @@ export type ThrustTape = {
   down5d20: number;
 };
 
+export type BreadthDay = {
+  date: string;
+  up45: number;
+  down45: number;
+  up5d20: number;
+  down5d20: number;
+  above20: number;
+  below20: number;
+  above50: number;
+  below50: number;
+  above200: number;
+  below200: number;
+};
+
 export type NseBreadth = {
   asOf: string;
   source: "nse" | "tradingview";
@@ -43,6 +59,8 @@ export type NseBreadth = {
   thrust: ThrustTape | null;
   week52High: number | null;
   week52Low: number | null;
+  usa: { nyse: BreadthSlice | null; nasdaq: BreadthSlice | null; combined: BreadthSlice | null };
+  history: BreadthDay[];
   error?: string;
 };
 
@@ -65,6 +83,10 @@ type NseIndexRow = {
   declines?: number | string;
   unchanged?: number | string;
 };
+
+function emptyUsa() {
+  return { nyse: null as BreadthSlice | null, nasdaq: null as BreadthSlice | null, combined: null as BreadthSlice | null };
+}
 
 function emptyTape(): Pick<NseBreadth, "sectors" | "movingAverages" | "thrust"> {
   return {
@@ -231,6 +253,8 @@ async function fromNse(): Promise<NseBreadth> {
     sectors,
     week52High,
     week52Low,
+    usa: emptyUsa(),
+    history: [],
   };
 }
 
@@ -243,8 +267,12 @@ const TV_NSE: TvClause[] = [
   { left: "is_primary", operation: "equal", right: true },
 ];
 
-async function tvCount(extra: TvClause[] = []): Promise<number> {
-  const res = await fetch("https://scanner.tradingview.com/india/scan", {
+async function tvScanCount(
+  url: string,
+  markets: string[],
+  filter: TvClause[],
+): Promise<number> {
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       Accept: "application/json",
@@ -254,8 +282,8 @@ async function tvCount(extra: TvClause[] = []): Promise<number> {
       Referer: "https://www.tradingview.com/",
     },
     body: JSON.stringify({
-      markets: ["india"],
-      filter: [...TV_NSE, ...extra],
+      markets,
+      filter,
       columns: ["name"],
       range: [0, 1],
     }),
@@ -267,6 +295,72 @@ async function tvCount(extra: TvClause[] = []): Promise<number> {
   const n = body.totalCount;
   if (n == null || !Number.isFinite(n)) throw new Error("tv scan empty");
   return n;
+}
+
+async function tvCount(extra: TvClause[] = []): Promise<number> {
+  return tvScanCount("https://scanner.tradingview.com/india/scan", ["india"], [...TV_NSE, ...extra]);
+}
+
+const TV_US: TvClause[] = [
+  { left: "type", operation: "equal", right: "stock" },
+  { left: "is_primary", operation: "equal", right: true },
+];
+
+async function tvUsCount(exchange: "NYSE" | "NASDAQ", extra: TvClause[] = []): Promise<number> {
+  return tvScanCount("https://scanner.tradingview.com/america/scan", ["america"], [
+    { left: "exchange", operation: "equal", right: exchange },
+    ...TV_US,
+    ...extra,
+  ]);
+}
+
+function adSlice(
+  id: string,
+  name: string,
+  short: string,
+  advances: number,
+  declines: number,
+  unchanged: number,
+): BreadthSlice {
+  const total = advances + declines + unchanged;
+  return {
+    id,
+    name,
+    short,
+    advances,
+    declines,
+    unchanged,
+    total,
+    advanceShare: total > 0 ? advances / total : null,
+    last: null,
+    changePct: null,
+  };
+}
+
+async function fetchUsaBreadth(): Promise<NseBreadth["usa"]> {
+  try {
+    const [nyAdv, nyDec, nyUnch, nqAdv, nqDec, nqUnch] = await Promise.all([
+      tvUsCount("NYSE", [{ left: "change", operation: "greater", right: 0 }]),
+      tvUsCount("NYSE", [{ left: "change", operation: "less", right: 0 }]),
+      tvUsCount("NYSE", [{ left: "change", operation: "equal", right: 0 }]),
+      tvUsCount("NASDAQ", [{ left: "change", operation: "greater", right: 0 }]),
+      tvUsCount("NASDAQ", [{ left: "change", operation: "less", right: 0 }]),
+      tvUsCount("NASDAQ", [{ left: "change", operation: "equal", right: 0 }]),
+    ]);
+    const nyse = adSlice("nyse", "NYSE", "NYSE", nyAdv, nyDec, nyUnch);
+    const nasdaq = adSlice("nasdaq", "Nasdaq", "NASDAQ", nqAdv, nqDec, nqUnch);
+    const combined = adSlice(
+      "usa",
+      "US cash",
+      "US",
+      nyse.advances + nasdaq.advances,
+      nyse.declines + nasdaq.declines,
+      nyse.unchanged + nasdaq.unchanged,
+    );
+    return { nyse, nasdaq, combined };
+  } catch {
+    return emptyUsa();
+  }
 }
 
 function maTape(label: string, above: number, below: number): MaTape {
@@ -339,6 +433,8 @@ async function fromTradingView(): Promise<NseBreadth> {
     ...emptyTape(),
     week52High: null,
     week52Low: null,
+    usa: emptyUsa(),
+    history: [],
   };
 }
 
@@ -351,6 +447,8 @@ function failedBreadth(message: string): NseBreadth {
     ...emptyTape(),
     week52High: null,
     week52Low: null,
+    usa: emptyUsa(),
+    history: [],
     error: message,
   };
 }
@@ -368,11 +466,15 @@ export async function fetchNseBreadth(): Promise<NseBreadth> {
     }
   }
   const tape = await tapeP;
-  if (!tape) return base;
+  const mas = tape?.movingAverages ?? base.movingAverages;
+  const thrust = tape?.thrust ?? base.thrust;
+  const live = liveBreadthDay(thrust, mas);
+  const history = await mergeBreadthDay(live);
   return {
     ...base,
-    movingAverages: tape.movingAverages,
-    thrust: tape.thrust,
+    movingAverages: mas,
+    thrust,
+    history,
   };
 }
 
